@@ -32,4 +32,12 @@ final class AlertLeadTimeTests: XCTestCase {
         // Assert: Comprobamos que el valor válido se mantiene igual
         XCTAssertEqual(leadTime.minutes, 12, "Los valores entre 1 y 19 deben mantenerse intactos")
     }
+    
+    func testPresets_three() {
+        // Arrange & Act
+        let leadTime = AlertLeadTime.threeMinutes
+        
+        // Assert: Comprobamos que el valor válido se mantiene igual
+        XCTAssertEqual(leadTime.minutes, 3, "Debe devolver 3")
+    }
 }
