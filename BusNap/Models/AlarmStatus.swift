@@ -8,7 +8,7 @@
 import Foundation
 
 //Tipo de dato del Estado de la alarma
-enum AlarmStatus: Equatable {
+enum AlarmStatus: String, Equatable, Codable {
     case inactive
     case configured
     case monitoring
