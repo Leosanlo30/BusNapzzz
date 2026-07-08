@@ -1,6 +1,6 @@
 import Testing
 @testable import BusNap
-
+@MainActor
 @Suite("Destination")
 struct DestinationTests {
 
