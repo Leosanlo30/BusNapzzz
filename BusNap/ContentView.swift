@@ -9,17 +9,8 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Welcome to BUSNAPZZZ")
-                .font(.largeTitle)
-                .bold()
-                .foregroundColor(.primary)
-                .padding()
-        }
-        .padding()
+        // Simplemente cargamos nuestra nueva vista principal
+        MapDashboardView()
     }
 }
 
