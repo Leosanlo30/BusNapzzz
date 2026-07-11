@@ -1,55 +1,70 @@
-//
-//  DestinationMapView.swift
-//  BusNap
-//
-//  Created by Leonardo Ariel San Martin Lopez  on 09/07/26.
-//
-
-import Foundation
 import SwiftUI
 import MapKit
 
+@MainActor
 struct DestinationMapView: View {
     var viewModel: MapDashboardViewModel
-
-    let initialPosition = MapCameraPosition.region(
-        MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 20.9673, longitude: -89.6236),
-            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-        )
-    )
-
+    
+    @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
+    
     var body: some View {
-        // Envolvemos todo en el MapReader
         MapReader { proxy in
-            Map(initialPosition: initialPosition) {
+            Map(position: $cameraPosition) {
                 
-                if let destination = viewModel.selectedDestination {
-                    let coordinate = CLLocationCoordinate2D(latitude: destination.latitude, longitude: destination.longitude)
+                // 1. Muestra el punto azul del usuario
+                UserAnnotation()
+                
+                // Si el usuario ya marcó un destino, dibujamos los elementos
+                if let dest = viewModel.selectedDestination {
                     
-                    Marker(destination.name ?? "Destino", coordinate: coordinate)
-                        .tint(AppConstants.Colors.primaryAccent)
+                    // --- CÁLCULO DEL RADIO DINÁMICO ---
+                    // Convertimos los minutos elegidos por el usuario a segundos
+                    let leadTimeSeconds = Double(viewModel.leadTime.minutes * 60)
+                    
+                    // Asumimos una velocidad promedio urbana de 11 m/s (aprox 40 km/h)
+                    let estimatedSpeedPointsPerSecond: Double = 5.5
+                    
+                    // Calculamos el radio dinámico (mínimo 1000m por seguridad de la antena GPS)
+                    let dynamicRadius = max(500.0, leadTimeSeconds * estimatedSpeedPointsPerSecond)
+                    
+                    // 2. El pin clásico del destino
+                    Marker(
+                        dest.name ?? "Destino Marcado",
+                        coordinate: CLLocationCoordinate2D(latitude: dest.latitude, longitude: dest.longitude)
+                    )
+                    .tint(.blue)
+                    
+                    // 3. NUEVO: El radio visual de la Geocerca adaptable
+                    MapCircle(
+                        center: CLLocationCoordinate2D(latitude: dest.latitude, longitude: dest.longitude),
+                        radius: dynamicRadius
+                    )
+                    .foregroundStyle(.blue.opacity(0.15)) // Relleno suave para no tapar las calles del mapa
+                    .stroke(.blue, lineWidth: 2)         // Borde definido para notar el cruce exacto
                 }
             }
-            .mapStyle(.standard)
             
-            .onTapGesture(coordinateSpace: .local) { location in
-                if let coordinate = proxy.convert(location, from: .local) {
-                    
+            // Estilo del Mapa unicamente en 2D
+            .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+            
+            //Gestos de pantalla del mapa
+            .onTapGesture { position in
+                if let coordinate = proxy.convert(position, from: .local) {
                     let newDestination = Destination(
-                        name: "Destino Seleccionado",
+                        name: "Punto Seleccionado",
                         latitude: coordinate.latitude,
                         longitude: coordinate.longitude
                     )
                     viewModel.updateDestination(newDestination)
                 }
+                //Controles del mapa
+            }
+            .mapControls {
+                MapUserLocationButton()
+                MapCompass()
+                MapPitchToggle()
             }
         }
-        // Traductor matematico y mapa miden lo mismo (para que el tap no se desplace)
-        .ignoresSafeArea()
+        .ignoresSafeArea(edges: .all)
     }
-}
-
-#Preview {
-    DestinationMapView(viewModel: MapDashboardViewModel())
 }

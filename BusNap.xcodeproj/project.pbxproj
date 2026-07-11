@@ -29,9 +29,22 @@
 		4C73FA522FDA5E2A009B39C8 /* BusNapUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BusNapUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4C89C8603002D4CD00267BCB /* Exceptions for "BusNap" folder in "BusNap" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4C73FA3A2FDA5E29009B39C8 /* BusNap */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4C73FA3D2FDA5E29009B39C8 /* BusNap */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4C89C8603002D4CD00267BCB /* Exceptions for "BusNap" folder in "BusNap" target */,
+			);
 			path = BusNap;
 			sourceTree = "<group>";
 		};
@@ -400,7 +413,10 @@
 				DEVELOPMENT_TEAM = QXBA5JMDWT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BusNap/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Para poder despertarte a tiempo, BusNap necesita monitorear tu ubicación en segundo plano mientras duermes con el teléfono bloqueado en el autobús.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BusNap necesita acceder a tu ubicación para mostrar tu posición en el mapa y permitirte elegir tu paradero de destino.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -411,7 +427,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "-.BusNap";
+				PRODUCT_BUNDLE_IDENTIFIER = com.leonardo.BusNap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -433,7 +449,10 @@
 				DEVELOPMENT_TEAM = QXBA5JMDWT;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BusNap/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Para poder despertarte a tiempo, BusNap necesita monitorear tu ubicación en segundo plano mientras duermes con el teléfono bloqueado en el autobús.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "BusNap necesita acceder a tu ubicación para mostrar tu posición en el mapa y permitirte elegir tu paradero de destino.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -444,7 +463,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "-.BusNap";
+				PRODUCT_BUNDLE_IDENTIFIER = com.leonardo.BusNap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;

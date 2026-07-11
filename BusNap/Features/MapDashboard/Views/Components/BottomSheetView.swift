@@ -1,28 +1,24 @@
-//
-//  BottomSheetView.swift
-//  BusNap
-//
-//  Created by Leonardo Ariel San Martin Lopez  on 09/07/26.
-//
-
 import Foundation
 import SwiftUI
 
 struct BottomSheetView: View {
-    // Recibimos el ViewModel. Como usamos @Observable, SwiftUI
-    // detectará automáticamente los cambios al leer estas variables.
     var viewModel: MapDashboardViewModel
+    
+    // Propiedad computada para saber si estamos en estado de "espera de usuario"
+    var isWaitingForUser: Bool {
+        viewModel.alarmStatus == .idle || viewModel.alarmStatus == .configured
+    }
     
     var body: some View {
         VStack(spacing: 16) {
             
-            //Título dinámico
-            Text(viewModel.alarmStatus == .inactive ? "Configura tu Viaje" : "Monitoreando Viaje")
+            // Título dinámico basado en la propiedad computada
+            Text(isWaitingForUser ? "Configura tu Viaje" : "Monitoreando Viaje")
                 .font(.title2)
                 .fontWeight(.bold)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            //Información del destino
+            // Información del destino
             HStack {
                 Image(systemName: "mappin.and.ellipse")
                     .foregroundColor(AppConstants.Colors.primaryAccent)
@@ -37,25 +33,79 @@ struct BottomSheetView: View {
                 Spacer()
             }
             
-            //ETA Simulado (Solo se muestra si existe)
-            if let eta = viewModel.simulatedETA {
-                HStack {
-                    Image(systemName: "clock.fill")
-                        .foregroundColor(.green)
-                    Text("Llegada en aprox. \(eta) min")
-                        .fontWeight(.semibold)
-                    Spacer()
-                }
+            // Selector de tiempo de anticipación (Solo visible si no estamos monitoreando)
+            if isWaitingForUser {
+                LeadTimePickerView(viewModel: viewModel)
+                    .padding(.top, 4)
+                Button("🎵 Probar Altavoz") {
+                        AudioManager.shared.playAlarm()
+                        // Lo apagamos automáticamente a los 4 segundos para no volvernos locos
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                            AudioManager.shared.stopAlarm()
+                        }
+                    }
+                .font(.caption)
+                .foregroundColor(.blue)
+                .padding(.top, 2)
             }
             
-            // Botón de Acción Principal (Usando el que creamos en el Issue 1)
-            if viewModel.alarmStatus == .inactive {
+            
+            
+            // Bloque Dinámico de advertencias
+            Group {
+                // 1. Advertencias de GPS
+                if viewModel.permissionState == .denied || viewModel.permissionState == .restricted {
+                    WarningBanner(
+                        icon: "location.slash.fill",
+                        message: "GPS denegado. Ve a Configuración de iOS para permitir el acceso."
+                    )
+                }
+                else if viewModel.permissionState == .authorizedWhenInUse && !isWaitingForUser {
+                    WarningBanner(
+                        icon: "exclamationmark.shield.fill",
+                        message: "¡Cuidado! Si bloqueas la pantalla, la alarma podría no sonar. Otorga permiso 'Siempre'."
+                    )
+                }
+                // 2. Advertencias de Red
+                else if viewModel.isOffline {
+                    WarningBanner(
+                        icon: "wifi.slash",
+                        message: "Sin conexión. El cálculo podría fallar."
+                    )
+                }
+                // 3. Estados de Carga y Éxito
+                else if viewModel.isLoadingETA {
+                    HStack {
+                        ProgressView()
+                            .padding(.trailing, 8)
+                        Text("Calculando ruta...")
+                            .foregroundColor(AppConstants.Colors.secondaryText)
+                            .fontWeight(.medium)
+                        Spacer()
+                    }
+                } else if let eta = viewModel.simulatedETA {
+                    HStack {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.green)
+                        let minutes = max(1, Int(eta / 60))
+                        Text("Tiempo de ruta: \(minutes) min")
+                            .fontWeight(.semibold)
+                        Spacer()
+                    }
+                } else if let error = viewModel.errorMessage {
+                    WarningBanner(icon: "exclamationmark.triangle.fill", message: error)
+                }
+            }
+            .frame(minHeight: 24)
+            
+            // Botón de Acción Principal
+            if isWaitingForUser {
                 PrimaryButton(title: "Activar Alarma") {
                     viewModel.activateTrip()
                 }
-                // Si no hay destino, bajamos la opacidad y bloqueamos el tap
-                .opacity(viewModel.selectedDestination == nil ? 0.5 : 1.0)
-                .disabled(viewModel.selectedDestination == nil)
+                // Bloqueamos el botón si no hay destino, si está cargando o si no hay GPS
+                .opacity(viewModel.selectedDestination == nil || viewModel.isLoadingETA || viewModel.permissionState == .denied ? 0.5 : 1.0)
+                .disabled(viewModel.selectedDestination == nil || viewModel.isLoadingETA || viewModel.permissionState == .denied)
                 
             } else {
                 PrimaryButton(title: "Cancelar Viaje") {
@@ -70,13 +120,20 @@ struct BottomSheetView: View {
     }
 }
 
-#Preview {
-    // Creamos un ViewModel falso para el preview
-    let mockViewModel = MapDashboardViewModel()
-    // Descomenta la siguiente línea para ver cómo se ve con un destino asignado
-    // mockViewModel.updateDestination(Destination(name: "Facultad de Matemáticas", latitude: 0, longitude: 0))
+// Subvista extraída para mantener el código principal limpio y reutilizable
+struct WarningBanner: View {
+    let icon: String
+    let message: String
     
-    return BottomSheetView(viewModel: mockViewModel)
-        .padding()
-        .background(Color.gray.opacity(0.3))
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(.red)
+            Text(message)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.red)
+            Spacer()
+        }
+    }
 }

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="Xcode">
+    
+    <wpt lat="21.002250" lon="-89.638583">
+        
+        <name>Inicio</name>
+    </wpt>
+    
+    <wpt lat="21.005000" lon="-89.640000">
+        <name>Camino</name>
+    </wpt>
+    
+    <wpt lat="21.010000" lon="-89.645000">
+        <name>Zona Crítica</name>
+    </wpt>
+</gpx>
