@@ -8,12 +8,17 @@
 import SwiftUI
 
 struct ContentView: View {
+    // Recibimos el ViewModel desde BusNapApp
+    var viewModel: MapDashboardViewModel
+    
     var body: some View {
-        // Simplemente cargamos nuestra nueva vista principal
-        MapDashboardView()
+        // Se lo pasamos a nuestra vista principal
+        MapDashboardView(viewModel: viewModel)
     }
 }
 
 #Preview {
-    ContentView()
+    @MainActor in
+    let mockVM = MapDashboardViewModel()
+    return ContentView(viewModel: mockVM)
 }

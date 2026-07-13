@@ -6,9 +6,11 @@
 //
 
 import Foundation
+import SwiftUI 
 import Observation
 
-@Observable //Para que el programa actualice por si misma la pantala cada que se cambie de estado
+@MainActor
+@Observable
 class MapDashboardViewModel {
     
     // MARK: - Estado de la Interfaz (Propiedades)
@@ -51,9 +53,36 @@ class MapDashboardViewModel {
 
     // MARK: - Intenciones (Mutaciones de Estado)
     
-    /// Actualiza el destino seleccionado por el usuario
-    func updateDestination(_ destination: Destination) {
-        self.selectedDestination = destination
+    // MARK: - Dependencias
+    @ObservationIgnored private let routeEstimator: RouteEstimating
+    @ObservationIgnored private let preferencesStore: UserPreferencesStoring
+    @ObservationIgnored private let networkMonitor: NetworkMonitoring
+    @ObservationIgnored private let locationManager: LocationManaging
+    @ObservationIgnored private let tripEngine: TripEngine
+    
+    // Inicializador completo con inyección de dependencias
+    init(routeEstimator: RouteEstimating? = nil,
+         preferencesStore: UserPreferencesStoring? = nil,
+         networkMonitor: NetworkMonitoring? = nil,
+         locationManager: LocationManaging? = nil,
+         tripEngine: TripEngine? = nil) {
+        
+        self.routeEstimator = routeEstimator ?? MapKitRouteEstimator()
+        self.preferencesStore = preferencesStore ?? UserDefaultsPreferencesStore()
+        self.networkMonitor = networkMonitor ?? NetworkMonitor()
+        self.locationManager = locationManager ?? LocationManager()
+        self.tripEngine = tripEngine ?? TripEngine()
+        
+        self.leadTime = self.preferencesStore.loadLeadTime()
+        
+        // Configuración del monitor de red
+        self.networkMonitor.setStatusHandler { [weak self] offline in
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.isOffline = offline
+            }
+        }
+        self.networkMonitor.start()
     }
     
     /// Modifica el tiempo de anticipación para la alarma y lo persiste
@@ -64,31 +93,45 @@ class MapDashboardViewModel {
         }
     }
     
-    /// Inicia el flujo de viaje, simulando la transición de estados
     func activateTrip() {
-        // Bloqueo de seguridad: no podemos activar sin destino
-        guard selectedDestination != nil else {
-            print("Error: Intento de activar viaje sin destino.")
+        print("🚨 [ALERTA] ¡Alguien llamó a activateTrip!")
+        guard let destination = tripEngine.currentDestination else { return }
+        
+        // 1. Validar permisos antes de arrancar
+        if permissionState == .notDetermined {
+            // NUEVO: Pedimos el permiso "Siempre" para que la geocerca despierte la app
+            locationManager.requestAlwaysAuthorization()
             return
         }
         
-        // Pasamos al estado configurado
-        alarmStatus = .configured
+        if permissionState == .denied || permissionState == .restricted {
+            errorMessage = "No podemos activar la alarma sin acceso al GPS."
+            return
+        }
         
-        //Simulamos que el motor arranca y pasamos a monitorear
-        //inicio del loop principal.
-        alarmStatus = .monitoring
+        AudioManager.shared.prepareAudioEngine()
         
-        // Simulamos un ETA inicial (ej. 45 minutos)
-        simulatedETA = 45
-        
-        print("Viaje activado hacia: \(selectedDestination?.name ?? "Desconocido")")
+        // 2. Si todo es correcto, disparamos el motor
+        tripEngine.startTrip(to: destination)
+        errorMessage = nil
     }
     
-    /// Cancela el viaje activo y resetea los valores al estado inactivo
     func cancelTrip() {
-        alarmStatus = .inactive
-        selectedDestination = nil
+        // Purga de recursos en el motor
+        tripEngine.cancelTrip()
+        simulatedETA = nil
+        errorMessage = nil
+    }
+    
+    func updateLeadTime(_ newTime: AlertLeadTime) {
+            self.leadTime = newTime
+            preferencesStore.saveLeadTime(newTime)
+        }
+    
+    // MARK: - Lógica Privada
+    private func fetchETA(for destination: Destination) {
+        isLoadingETA = true
+        errorMessage = nil
         simulatedETA = nil
         print("Viaje cancelado. Sistema inactivo.")
     }
