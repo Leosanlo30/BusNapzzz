@@ -1,64 +1,33 @@
 <?xml version="1.0"?>
 <gpx version="1.1" creator="Xcode">
     
-    <wpt lat="21.048700" lon="-89.644500">
-        <name>Paradero UADY Exactas</name>
-        <time>2026-07-11T15:00:00Z</time>
+    <wpt lat="21.047052" lon="-89.644283">
+        <name>Facultad de Matemáticas</name>
+        <time>2026-07-11T16:00:00Z</time>
     </wpt>
     
-    <wpt lat="21.049400" lon="-89.652100">
-        <name>Periférico - City Center</name>
-        <time>2026-07-11T15:00:15Z</time>
-    </wpt>
-
-    <wpt lat="21.046100" lon="-89.661700">
-        <name>Periférico - Salida Progreso</name>
-        <time>2026-07-11T15:00:30Z</time>
-    </wpt>
-
-    <wpt lat="21.042500" lon="-89.670500">
-        <name>Curva Galerías</name>
-        <time>2026-07-11T15:00:45Z</time>
-    </wpt>
-
-    <wpt lat="21.034700" lon="-89.674300">
-        <name>Periférico - Fco de Montejo</name>
-        <time>2026-07-11T15:01:00Z</time>
-    </wpt>
-
-    <wpt lat="21.025500" lon="-89.676600">
-        <name>Periférico - Ingeniería</name>
-        <time>2026-07-11T15:01:15Z</time>
-    </wpt>
-
-    <wpt lat="21.014200" lon="-89.677900">
-        <name>Periférico - Caucel</name>
-        <time>2026-07-11T15:01:30Z</time>
-    </wpt>
-
-    <wpt lat="20.999500" lon="-89.677500">
-        <name>Periférico - Juan Pablo II</name>
-        <time>2026-07-11T15:01:45Z</time>
-    </wpt>
-
-    <wpt lat="20.988600" lon="-89.676100">
-        <name>Lateral Salida Canek</name>
-        <time>2026-07-11T15:02:00Z</time>
-    </wpt>
-
-    <wpt lat="20.988300" lon="-89.668500">
-        <name>Av. Jacinto Canek (Soriana)</name>
-        <time>2026-07-11T15:02:15Z</time>
-    </wpt>
-
-    <wpt lat="20.988200" lon="-89.662000">
-        <name>Av. Jacinto Canek</name>
-        <time>2026-07-11T15:02:30Z</time>
-    </wpt>
-
-    <wpt lat="20.988200" lon="-89.655800">
-        <name>Paradero Walmart Canek</name>
-        <time>2026-07-11T15:02:45Z</time>
-    </wpt>
+    <wpt lat="21.041429" lon="-89.652583">
+        <name>CRIT</name>
+        <time>2026-07-11T16:01:15Z</time> </wpt>
+    
+    <wpt lat="21.036376" lon="-89.654566">
+        <name>Real Montejo</name>
+        <time>2026-07-11T16:01:45Z</time> </wpt>
+    
+    <wpt lat="21.017705" lon="-89.661916">
+        <name>Chenkú</name>
+        <time>2026-07-11T16:03:35Z</time> </wpt>
+    
+    <wpt lat="21.013451" lon="-89.663679">
+        <name>Tec Poniente</name>
+        <time>2026-07-11T16:04:20Z</time> </wpt>
+    
+    <wpt lat="21.005512" lon="-89.667206">
+        <name>San Francisco Porvenir</name>
+        <time>2026-07-11T16:05:05Z</time> </wpt>
+    
+    <wpt lat="20.996613" lon="-89.672962">
+        <name>Jacinto Canek</name>
+        <time>2026-07-11T16:06:15Z</time> </wpt>
 
 </gpx>

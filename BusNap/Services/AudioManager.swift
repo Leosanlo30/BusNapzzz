@@ -7,10 +7,13 @@
 
 import Foundation
 import AVFoundation
+import AudioToolbox // Vibracion
 
 class AudioManager {
     static let shared = AudioManager()
     private var audioPlayer: AVAudioPlayer?
+    private var vibrationTask: Task<Void, Never>?
+    private var isVibrating = false
     
     private init() {}
     
@@ -47,6 +50,7 @@ class AudioManager {
             audioPlayer?.volume = 1.0
             audioPlayer?.play()
             print(" Alarma sonando en loop...")
+            startVibrationLoop()
         } catch {
             print(" No se pudo reproducir el archivo: \(error.localizedDescription)")
         }
@@ -56,6 +60,8 @@ class AudioManager {
         if audioPlayer?.isPlaying == true {
             audioPlayer?.stop()
             audioPlayer = nil
+            
+            stopVibrationLoop()
             
             // Apagamos el motor de audio para ahorrar batería
             do {
@@ -67,4 +73,33 @@ class AudioManager {
             print(" Alarma detenida.")
         }
     }
+    
+    // MARK: - Funciones de vibracion
+    private func startVibrationLoop() {
+            isVibrating = true
+            
+            // Creamos una tarea asíncrona que vivirá en segundo plano
+            vibrationTask = Task {
+                while isVibrating {
+                    // 1. Primera vibración
+                    AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
+                    
+                    // Pausa cortísima de 0.4 segundos (400 millones de nanosegundos)
+                    try? await Task.sleep(nanoseconds: 400_000_000)
+                    
+                    // 2. Segunda vibración inmediata (efecto "spam" o latido)
+                    AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
+                    
+                    // Pausa más larga de 1 segundo antes de repetir el ciclo
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                }
+            }
+        }
+        
+        private func stopVibrationLoop() {
+            // Apagamos la bandera y cancelamos la tarea asíncrona
+            isVibrating = false
+            vibrationTask?.cancel()
+            vibrationTask = nil
+        }
 }
