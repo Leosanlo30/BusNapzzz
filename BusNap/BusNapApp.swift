@@ -11,7 +11,7 @@ import SwiftUI
 struct BusNapApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MapDashboardView()
         }
     }
 }
