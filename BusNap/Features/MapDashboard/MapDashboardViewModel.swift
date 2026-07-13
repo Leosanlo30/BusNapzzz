@@ -12,12 +12,43 @@ import Observation
 class MapDashboardViewModel {
     
     // MARK: - Estado de la Interfaz (Propiedades)
-    
+
     var alarmStatus: AlarmStatus = .inactive
-    var selectedDestination: Destination? = nil //opcional al princio (iniciar la app)
+    var selectedDestination: Destination? = nil
     var leadTime: AlertLeadTime = .fiveMinutes
-    var simulatedETA: Int? = nil // Representado en minutos | opcional al princio (iniciar la app)
+    var simulatedETA: Int? = nil
+
+    // MARK: - Configuración de Viaje (persiste entre sesiones)
+
+    var vibrateEnabled: Bool = true {
+        didSet { UserDefaults.standard.set(vibrateEnabled, forKey: "vibrateEnabled") }
+    }
+    var selectedRingtone: String = "Default" {
+        didSet { UserDefaults.standard.set(selectedRingtone, forKey: "selectedRingtone") }
+    }
+    var appTheme: AppTheme = .system {
+        didSet { UserDefaults.standard.set(appTheme.rawValue, forKey: "appTheme") }
+    }
+    var showDebugOverlay: Bool = false
     
+    // MARK: - Inicializador (carga configuración guardada)
+
+    init() {
+        UserDefaults.standard.register(defaults: [
+            "vibrateEnabled": true,
+            "selectedRingtone": "Default",
+            "appTheme": AppTheme.system.rawValue
+        ])
+        vibrateEnabled    = UserDefaults.standard.bool(forKey: "vibrateEnabled")
+        selectedRingtone  = UserDefaults.standard.string(forKey: "selectedRingtone") ?? "Default"
+        appTheme          = AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? "") ?? .system
+
+        if let data  = UserDefaults.standard.data(forKey: "leadTime"),
+           let saved = try? JSONDecoder().decode(AlertLeadTime.self, from: data) {
+            leadTime = saved
+        }
+    }
+
     // MARK: - Intenciones (Mutaciones de Estado)
     
     /// Actualiza el destino seleccionado por el usuario
@@ -25,9 +56,12 @@ class MapDashboardViewModel {
         self.selectedDestination = destination
     }
     
-    /// Modifica el tiempo de anticipación para la alarma
+    /// Modifica el tiempo de anticipación para la alarma y lo persiste
     func updateLeadTime(_ time: AlertLeadTime) {
         self.leadTime = time
+        if let data = try? JSONEncoder().encode(time) {
+            UserDefaults.standard.set(data, forKey: "leadTime")
+        }
     }
     
     /// Inicia el flujo de viaje, simulando la transición de estados
@@ -56,7 +90,14 @@ class MapDashboardViewModel {
         alarmStatus = .inactive
         selectedDestination = nil
         simulatedETA = nil
-        
         print("Viaje cancelado. Sistema inactivo.")
+    }
+
+    /// Apaga la alarma cuando está sonando y regresa al estado inicial
+    func dismissAlarm() {
+        alarmStatus = .inactive
+        selectedDestination = nil
+        simulatedETA = nil
+        print("Alarma apagada.")
     }
 }

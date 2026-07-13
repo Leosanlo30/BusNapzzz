@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct BusNapApp: App {
+    @AppStorage("appTheme") private var themeRaw: String = AppTheme.system.rawValue
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MapDashboardView()
+                .preferredColorScheme(AppTheme(rawValue: themeRaw)?.colorScheme ?? nil)
         }
     }
 }

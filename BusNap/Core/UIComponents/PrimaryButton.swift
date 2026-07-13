@@ -12,7 +12,10 @@ struct PrimaryButton: View {
     let action: () -> Void //retorna nada
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            action()
+        }) {
             Text(title)
                 // Tipografía clara
                 .font(.headline)
