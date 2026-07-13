@@ -8,6 +8,25 @@
 import Foundation
 import SwiftUI
 
+// MARK: - App Theme
+
+enum AppTheme: String, CaseIterable, Identifiable {
+    case system = "Sistema"
+    case light  = "Claro"
+    case dark   = "Oscuro"
+
+    var id: String { rawValue }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
+    }
+}
+
+// MARK: - App Constants
 
 enum AppConstants {
     
@@ -27,14 +46,13 @@ enum AppConstants {
         
     }
     
-    //Medidas del Layout
-    enum Layout{
-        
-        static let cornerRadius: CGFloat = 16.0
+    enum Layout {
+        static let cornerRadius: CGFloat    = 16.0
         static let standardPadding: CGFloat = 16.0
-        static let buttonHeight: CGFloat = 56.0
-        
-        
+        static let buttonHeight: CGFloat    = 56.0
     }
-    
+
+    enum Ringtones {
+        static let available = ["Default", "Chime", "Bell", "Alert", "Sonar"]
+    }
 }

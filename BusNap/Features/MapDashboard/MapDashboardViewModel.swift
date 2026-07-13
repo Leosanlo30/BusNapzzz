@@ -13,21 +13,45 @@ import Observation
 @Observable
 class MapDashboardViewModel {
     
-    // MARK: - Estado de la UI
-    // Ahora leemos el estado directamente desde el motor de viaje (TripEngine)
-    var alarmStatus: TripState { tripEngine.state }
-    var selectedDestination: Destination? { tripEngine.currentDestination }
-    
-    var simulatedETA: TimeInterval? = nil
+    // MARK: - Estado de la Interfaz (Propiedades)
+
+    var alarmStatus: AlarmStatus = .inactive
+    var selectedDestination: Destination? = nil
     var leadTime: AlertLeadTime = .fiveMinutes
-    var isLoadingETA: Bool = false
-    var errorMessage: String? = nil
-    var isOffline: Bool = false
-    
-    // Propiedad computada puente para el estado de permisos
-    var permissionState: LocationPermissionState {
-        locationManager.permissionState
+    var simulatedETA: Int? = nil
+
+    // MARK: - Configuración de Viaje (persiste entre sesiones)
+
+    var vibrateEnabled: Bool = true {
+        didSet { UserDefaults.standard.set(vibrateEnabled, forKey: "vibrateEnabled") }
     }
+    var selectedRingtone: String = "Default" {
+        didSet { UserDefaults.standard.set(selectedRingtone, forKey: "selectedRingtone") }
+    }
+    var appTheme: AppTheme = .system {
+        didSet { UserDefaults.standard.set(appTheme.rawValue, forKey: "appTheme") }
+    }
+    var showDebugOverlay: Bool = false
+    
+    // MARK: - Inicializador (carga configuración guardada)
+
+    init() {
+        UserDefaults.standard.register(defaults: [
+            "vibrateEnabled": true,
+            "selectedRingtone": "Default",
+            "appTheme": AppTheme.system.rawValue
+        ])
+        vibrateEnabled    = UserDefaults.standard.bool(forKey: "vibrateEnabled")
+        selectedRingtone  = UserDefaults.standard.string(forKey: "selectedRingtone") ?? "Default"
+        appTheme          = AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? "") ?? .system
+
+        if let data  = UserDefaults.standard.data(forKey: "leadTime"),
+           let saved = try? JSONDecoder().decode(AlertLeadTime.self, from: data) {
+            leadTime = saved
+        }
+    }
+
+    // MARK: - Intenciones (Mutaciones de Estado)
     
     // MARK: - Dependencias
     @ObservationIgnored private let routeEstimator: RouteEstimating
@@ -61,12 +85,12 @@ class MapDashboardViewModel {
         self.networkMonitor.start()
     }
     
-    // MARK: - Intenciones (Acciones del Usuario)
-    
-    func updateDestination(_ destination: Destination) {
-        // Redirigimos la gestión del destino al motor
-        tripEngine.updateDestination(destination)
-        fetchETA(for: destination)
+    /// Modifica el tiempo de anticipación para la alarma y lo persiste
+    func updateLeadTime(_ time: AlertLeadTime) {
+        self.leadTime = time
+        if let data = try? JSONEncoder().encode(time) {
+            UserDefaults.standard.set(data, forKey: "leadTime")
+        }
     }
     
     func activateTrip() {
@@ -109,32 +133,14 @@ class MapDashboardViewModel {
         isLoadingETA = true
         errorMessage = nil
         simulatedETA = nil
-        
-        Task {
-            do {
-                let estimate = try await routeEstimator.estimateRoute(to: destination)
-                self.simulatedETA = estimate.expectedTravelTime
-                self.isLoadingETA = false
-            } catch {
-                self.errorMessage = error.localizedDescription
-                self.isLoadingETA = false
-            }
-        }
+        print("Viaje cancelado. Sistema inactivo.")
     }
-    
-    // MARK: - Gestión de Energía del Sistema
-    func handleScenePhase(_ phase: ScenePhase) {
-        switch phase {
-        case .background:
-            // El usuario bloqueó la pantalla o guardó el celular
-            locationManager.enableEcoMode()
-            
-        case .active:
-            // El usuario está viendo la pantalla
-            locationManager.disableEcoMode()
-            
-        default:
-            break
-        }
+
+    /// Apaga la alarma cuando está sonando y regresa al estado inicial
+    func dismissAlarm() {
+        alarmStatus = .inactive
+        selectedDestination = nil
+        simulatedETA = nil
+        print("Alarma apagada.")
     }
 }
