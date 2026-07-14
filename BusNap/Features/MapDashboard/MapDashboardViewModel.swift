@@ -6,15 +6,16 @@
 //
 
 import Foundation
-import SwiftUI 
+import SwiftUI
 import Observation
+import CoreLocation // Necesario para recibir CLLocation
+import MapKit
 
 @MainActor
 @Observable
 class MapDashboardViewModel {
     
     // MARK: - Estado de la UI
-    // Ahora leemos el estado directamente desde el motor de viaje (TripEngine)
     var alarmStatus: TripState { tripEngine.state }
     var selectedDestination: Destination? { tripEngine.currentDestination }
     
@@ -36,6 +37,10 @@ class MapDashboardViewModel {
     @ObservationIgnored private let locationManager: LocationManaging
     @ObservationIgnored private let tripEngine: TripEngine
     
+    // MARK: - Variables de Control de Energía
+    @ObservationIgnored private var lastETARequestTime: Date = .distantPast
+    @ObservationIgnored private var isAppInBackground: Bool = false
+    
     // Inicializador completo con inyección de dependencias
     init(routeEstimator: RouteEstimating? = nil,
          preferencesStore: UserPreferencesStoring? = nil,
@@ -51,7 +56,7 @@ class MapDashboardViewModel {
         
         self.leadTime = self.preferencesStore.loadLeadTime()
         
-        // Configuración del monitor de red
+        // 1. Configuración del monitor de red
         self.networkMonitor.setStatusHandler { [weak self] offline in
             guard let self = self else { return }
             Task { @MainActor in
@@ -59,12 +64,19 @@ class MapDashboardViewModel {
             }
         }
         self.networkMonitor.start()
+        
+        // 2. CONECTAMOS EL CABLE DEL GPS AL VIEWMODEL
+        self.locationManager.setLocationHandler { [weak self] newLocation in
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.processLocationUpdate(newLocation)
+            }
+        }
     }
     
     // MARK: - Intenciones (Acciones del Usuario)
     
     func updateDestination(_ destination: Destination) {
-        // Redirigimos la gestión del destino al motor
         tripEngine.updateDestination(destination)
         fetchETA(for: destination)
     }
@@ -73,9 +85,7 @@ class MapDashboardViewModel {
         print("🚨 [ALERTA] ¡Alguien llamó a activateTrip!")
         guard let destination = tripEngine.currentDestination else { return }
         
-        // 1. Validar permisos antes de arrancar
         if permissionState == .notDetermined {
-            // NUEVO: Pedimos el permiso "Siempre" para que la geocerca despierte la app
             locationManager.requestAlwaysAuthorization()
             return
         }
@@ -86,52 +96,80 @@ class MapDashboardViewModel {
         }
         
         AudioManager.shared.prepareAudioEngine()
-        
-        // 2. Si todo es correcto, disparamos el motor
         tripEngine.startTrip(to: destination)
         errorMessage = nil
     }
     
     func cancelTrip() {
-        // Purga de recursos en el motor
         tripEngine.cancelTrip()
         simulatedETA = nil
         errorMessage = nil
+        lastETARequestTime = .distantPast // Reiniciamos el cronómetro interno
     }
     
     func updateLeadTime(_ newTime: AlertLeadTime) {
-            self.leadTime = newTime
-            preferencesStore.saveLeadTime(newTime)
-        }
+        self.leadTime = newTime
+        preferencesStore.saveLeadTime(newTime)
+    }
     
     // MARK: - Lógica Privada
-    private func fetchETA(for destination: Destination) {
-        isLoadingETA = true
-        errorMessage = nil
-        simulatedETA = nil
+    
+    // MARK: - Lógica Privada
         
-        Task {
-            do {
-                let estimate = try await routeEstimator.estimateRoute(to: destination)
-                self.simulatedETA = estimate.expectedTravelTime
-                self.isLoadingETA = false
-            } catch {
-                self.errorMessage = error.localizedDescription
-                self.isLoadingETA = false
+        private func fetchETA(for destination: Destination, from currentLocation: CLLocation? = nil) {
+            if simulatedETA == nil { isLoadingETA = true }
+            errorMessage = nil
+            
+            Task {
+                do {
+                    // Le pasamos la coordenada actual al estimador
+                    let estimate = try await routeEstimator.estimateRoute(to: destination, from: currentLocation)
+                    self.simulatedETA = estimate.expectedTravelTime
+                    self.isLoadingETA = false
+                } catch {
+                    self.errorMessage = error.localizedDescription
+                    self.isLoadingETA = false
+                }
             }
+        }
+        
+    
+    private func processLocationUpdate(_ location: CLLocation) {
+        // Solo pedimos el ETA nuevo si estamos en viaje y con destino
+        guard alarmStatus == .monitoring, let destination = selectedDestination else { return }
+        
+        // EL FRENO DE MANO: Abortamos si la app está en el bolsillo
+        guard !isAppInBackground else { return }
+        
+        let now = Date()
+        
+        //Intervalo de debug
+        if now.timeIntervalSince(lastETARequestTime) >= 60 {
+            lastETARequestTime = now
+            print("🔄 [UI] Han pasado 60s. Pidiendo nuevo ETA a Apple Maps...")
+            fetchETA(for: destination)
         }
     }
     
     // MARK: - Gestión de Energía del Sistema
+    
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .background:
-            // El usuario bloqueó la pantalla o guardó el celular
+            isAppInBackground = true
             locationManager.enableEcoMode()
+            print("🌙 [ENERGÍA] Pantalla apagada: UI y peticiones de ETA pausadas.")
             
         case .active:
-            // El usuario está viendo la pantalla
+            isAppInBackground = false
             locationManager.disableEcoMode()
+            print("☀️ [ENERGÍA] Pantalla encendida: Retomando UI.")
+            
+            // Forzamos una actualización inmediata al abrir la app
+            if alarmStatus == .monitoring, let destination = selectedDestination {
+                lastETARequestTime = Date()
+                fetchETA(for: destination)
+            }
             
         default:
             break

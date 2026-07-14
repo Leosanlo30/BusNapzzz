@@ -7,60 +7,38 @@
 
 import Foundation
 import MapKit
+import CoreLocation
 
-// manejador de errores personalizado
-enum RoutingError: Error, LocalizedError {
-    case routeNotFound
-    case networkFailure(Error)
+class MapKitRouteEstimator: RouteEstimating {
     
-    var errorDescription: String? {
-        switch self {
-        case .routeNotFound:
-            return "No se encontró una ruta disponible hacia el destino seleccionado."
-        case .networkFailure(let error):
-            return "Error de red al calcular la ruta: \(error.localizedDescription)"
-        }
-    }
-}
-
-struct MapKitRouteEstimator: RouteEstimating {
-    
-    //funcion de estimar ruta
-    func estimateRoute(to destination: Destination) async throws -> RouteEstimate {
+    func estimateRoute(to destination: Destination, from currentLocation: CLLocation? = nil) async throws -> MKRoute {
         let request = MKDirections.Request()
-        request.source = MKMapItem.forCurrentLocation()
         
-        let destinationLocation = CLLocation(
-            latitude: destination.latitude,
-            longitude: destination.longitude
-        )
+        // 1. ORIGEN
+        if let location = currentLocation {
+           
+            // Pasamos 'address: nil' ya que solo nos interesan las coordenadas puras.
+            request.source = MKMapItem(location: location, address: nil)
+        } else {
+            request.source = MKMapItem.forCurrentLocation()
+        }
         
-        // pasamos la direccion: nil para cumplir con el contrato estricto de iOS 26+
-        let destinationItem = MKMapItem(location: destinationLocation, address: nil)
-        destinationItem.name = destination.name ?? "Destino"
+        // 2. DESTINO
+        // Convertimos tus coordenadas a un objeto CLLocation estándar
+        let destLocation = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
         
-        request.destination = destinationItem
-        request.transportType = .automobile // usamoss automobile debido a que Mapkit no tiene rutas de merida
+
+        request.destination = MKMapItem(location: destLocation, address: nil)
+        
+        request.transportType = .automobile
         
         let directions = MKDirections(request: request)
+        let response = try await directions.calculate()
         
-        do {
-            let response = try await directions.calculate()
-            
-            guard let primaryRoute = response.routes.first else {
-                throw RoutingError.routeNotFound
-            }
-            
-            //retorna la tura estimada con sus atributost
-            return RouteEstimate(
-                expectedTravelTime: primaryRoute.expectedTravelTime,
-                distance: primaryRoute.distance
-            )
-            
-        } catch let error as RoutingError {
-            throw error
-        } catch {
-            throw RoutingError.networkFailure(error)
+        guard let route = response.routes.first else {
+            throw NSError(domain: "RouteError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Ruta no encontrada"])
         }
+        
+        return route
     }
 }

@@ -19,6 +19,7 @@ final class LocationManager: NSObject, LocationManaging {
     
     // MARK: - Dependencias Internas
     @ObservationIgnored private let clManager = CLLocationManager()
+    @ObservationIgnored private var locationHandler: ((CLLocation) -> Void)? //guardará la función a ejecutar cuando haya movimiento
     
     override init() {
         super.init()
@@ -26,26 +27,23 @@ final class LocationManager: NSObject, LocationManaging {
         // 1. Nos auto-asignamos como el delegado para escuchar al hardware
         self.clManager.delegate = self
         
-        // --- OPTIMIZACIONES DE ENERGÍA (Reducen el impacto de Location en Xcode) ---
-        // 1. Reducimos la precisión para no usar el chip satelital al máximo todo el tiempo
+        // --- OPTIMIZACIONES DE ENERGÍA ---
         self.clManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        // 2. Filtro de distancia: solo despierta a la app si el usuario avanzó 50 metros
         self.clManager.distanceFilter = 50
-        // 3. Le decimos a iOS que esto es un viaje en vehículo
         self.clManager.activityType = .automotiveNavigation
-        // 4. Permite a iOS pausar el GPS si detecta que el camión está estacionado mucho tiempo
         self.clManager.pausesLocationUpdatesAutomatically = true
         // --------------------------------------------------------------------------
         
         // Pedimos privilegios de actualización constante en SEGUNDO PLANO
         self.clManager.allowsBackgroundLocationUpdates = true
-        
-        // la app SIGUE RASTREANDO LA RUTA (Píldora azul en la barra de estado)
         self.clManager.showsBackgroundLocationIndicator = true
         
         // 2. Sincronizamos el estado inicial la primera vez que se crea la clase
         self.permissionState = mapAuthorizationStatus(clManager.authorizationStatus)
-    }
+        
+        // Encender el GPS desde el inicio
+        self.clManager.startUpdatingLocation()
+        }
     
     // MARK: - Intenciones
     func requestWhenInUseAuthorization() {
@@ -56,6 +54,11 @@ final class LocationManager: NSObject, LocationManaging {
     func requestAlwaysAuthorization() {
         clManager.requestAlwaysAuthorization()
     }
+    
+    // Asigna el manejador de ubicación
+    func setLocationHandler(_ handler: @escaping (CLLocation) -> Void) {
+            self.locationHandler = handler
+        }
     
     // MARK: - Optimización Dinámica de Energía
         
@@ -72,6 +75,7 @@ final class LocationManager: NSObject, LocationManaging {
         // Cuando el usuario abre la app para ver por dónde va, devolvemos la precisión.
         clManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         clManager.distanceFilter = 50
+        clManager.startUpdatingLocation() // Despierta el GPS y que mande ubicacion para el ETA
         print("Modo Normal: GPS restaurado para el mapa.")
     }
     
@@ -112,4 +116,17 @@ extension LocationManager: CLLocationManagerDelegate {
             self.permissionState = self.mapAuthorizationStatus(newStatus)
         }
     }
+    
+    //Escucha los movimientos del GPS en tiempo real
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+            guard let location = locations.last else { return }
+            
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                
+                // Disparamos la ubicación hacia el ViewModel
+                self.locationHandler?(location)
+            }
+        }
+    
 }

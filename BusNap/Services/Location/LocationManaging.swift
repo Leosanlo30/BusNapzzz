@@ -6,6 +6,9 @@
 //
 
 import Foundation
+import MapKit
+import CoreLocation
+
 
 // Exigimos que cualquier manejador de ubicación opere bajo la protección del hilo de UI
 @MainActor
@@ -17,4 +20,6 @@ protocol LocationManaging {
     /* MODO AHORRO */
     func enableEcoMode()
     func disableEcoMode()
+    
+    func setLocationHandler(_ handler: @escaping (CLLocation) -> Void) //comunicación para enviar las coordenadas al ViewModel
 }

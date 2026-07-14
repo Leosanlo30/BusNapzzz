@@ -12,13 +12,13 @@ struct BottomSheetView: View {
     var body: some View {
         VStack(spacing: 16) {
             
-            // Título dinámico basado en la propiedad computada
+            // 1. Título dinámico
             Text(isWaitingForUser ? "Configura tu Viaje" : "Monitoreando Viaje")
                 .font(.title2)
                 .fontWeight(.bold)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            // Información del destino
+            // 2. Información del destino
             HStack {
                 Image(systemName: "mappin.and.ellipse")
                     .foregroundColor(AppConstants.Colors.primaryAccent)
@@ -33,48 +33,51 @@ struct BottomSheetView: View {
                 Spacer()
             }
             
-            // Selector de tiempo de anticipación (Solo visible si no estamos monitoreando)
+            // 3. Selector de tiempo (Solo si no estamos monitoreando)
             if isWaitingForUser {
                 LeadTimePickerView(viewModel: viewModel)
                     .padding(.top, 4)
+                
                 Button("🎵 Probar Altavoz") {
-                        AudioManager.shared.playAlarm()
-                        // Lo apagamos automáticamente a los 4 segundos para no volvernos locos
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                            AudioManager.shared.stopAlarm()
-                        }
+                    AudioManager.shared.playAlarm()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                        AudioManager.shared.stopAlarm()
                     }
+                }
                 .font(.caption)
                 .foregroundColor(.blue)
                 .padding(.top, 2)
             }
             
-            
-            
-            // Bloque Dinámico de advertencias
-            Group {
-                // 1. Advertencias de GPS
+            // 4. Bloque de Advertencias Críticas (Se queda en medio si ocurren errores)
+            VStack(spacing: 12) {
                 if viewModel.permissionState == .denied || viewModel.permissionState == .restricted {
                     WarningBanner(
                         icon: "location.slash.fill",
                         message: "GPS denegado. Ve a Configuración de iOS para permitir el acceso."
                     )
-                }
-                else if viewModel.permissionState == .authorizedWhenInUse && !isWaitingForUser {
+                } else if viewModel.permissionState == .authorizedWhenInUse && !isWaitingForUser {
                     WarningBanner(
                         icon: "exclamationmark.shield.fill",
                         message: "¡Cuidado! Si bloqueas la pantalla, la alarma podría no sonar. Otorga permiso 'Siempre'."
                     )
                 }
-                // 2. Advertencias de Red
-                else if viewModel.isOffline {
+                
+                if viewModel.isOffline {
                     WarningBanner(
                         icon: "wifi.slash",
                         message: "Sin conexión. El cálculo podría fallar."
                     )
                 }
-                // 3. Estados de Carga y Éxito
-                else if viewModel.isLoadingETA {
+                
+                if let error = viewModel.errorMessage {
+                    WarningBanner(icon: "exclamationmark.triangle.fill", message: error)
+                }
+            }
+            
+            // 5. ¡MOVIDO AQUÍ! Información del Tiempo Real Vial (Justo arriba del botón)
+            Group {
+                if viewModel.isLoadingETA {
                     HStack {
                         ProgressView()
                             .padding(.trailing, 8)
@@ -87,23 +90,24 @@ struct BottomSheetView: View {
                     HStack {
                         Image(systemName: "clock.fill")
                             .foregroundColor(.green)
-                        let minutes = max(1, Int(eta / 60))
+                        
+                        let minutes = max(1, Int(ceil(eta / 60)))
+                        
                         Text("Tiempo de ruta: \(minutes) min")
                             .fontWeight(.semibold)
+                            .foregroundColor(minutes <= viewModel.leadTime.minutes ? .red : .primary)
+                        
                         Spacer()
                     }
-                } else if let error = viewModel.errorMessage {
-                    WarningBanner(icon: "exclamationmark.triangle.fill", message: error)
                 }
             }
-            .frame(minHeight: 24)
+            .padding(.top, 4) // Pequeña separación estética antes de llegar al botón
             
-            // Botón de Acción Principal
+            // 6. Botón de Acción Principal
             if isWaitingForUser {
                 PrimaryButton(title: "Activar Alarma") {
                     viewModel.activateTrip()
                 }
-                // Bloqueamos el botón si no hay destino, si está cargando o si no hay GPS
                 .opacity(viewModel.selectedDestination == nil || viewModel.isLoadingETA || viewModel.permissionState == .denied ? 0.5 : 1.0)
                 .disabled(viewModel.selectedDestination == nil || viewModel.isLoadingETA || viewModel.permissionState == .denied)
                 
@@ -118,22 +122,23 @@ struct BottomSheetView: View {
         .cornerRadius(AppConstants.Layout.cornerRadius)
         .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
     }
-}
-
-// Subvista extraída para mantener el código principal limpio y reutilizable
-struct WarningBanner: View {
-    let icon: String
-    let message: String
     
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(.red)
-            Text(message)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.red)
-            Spacer()
+    // MARK: - Subvistas
+
+    struct WarningBanner: View {
+        let icon: String
+        let message: String
+        
+        var body: some View {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(.red)
+                Text(message)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.red)
+                Spacer()
+            }
         }
     }
 }

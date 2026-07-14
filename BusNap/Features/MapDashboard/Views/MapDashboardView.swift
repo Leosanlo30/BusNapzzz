@@ -50,7 +50,7 @@ struct MapDashboardView: View {
                 .padding(.bottom, 32)
                 .zIndex(2)
         }
-        .ignoresSafeArea(.keyboard)
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 }
 

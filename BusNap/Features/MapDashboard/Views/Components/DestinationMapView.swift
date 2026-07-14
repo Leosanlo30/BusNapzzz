@@ -44,6 +44,7 @@ struct DestinationMapView: View {
                 }
             }
             
+            .safeAreaPadding(.top, 80)
             // Estilo del Mapa unicamente en 2D
             .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
             
