@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BottomSheetContent: View {
     @Bindable var viewModel: MapDashboardViewModel
+    let onOpenSettings: () -> Void
     @FocusState private var isNameFocused: Bool
 
     var body: some View {
@@ -26,19 +27,18 @@ struct BottomSheetContent: View {
     // MARK: - Initial State
 
     private var initialState: some View {
-        VStack(spacing: 0) {
-            searchBar
-                .padding(.bottom, 20)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                searchBar
+                    .padding(.bottom, 20)
 
-            if !viewModel.savedFavorites.isEmpty {
-                ScrollView(.vertical, showsIndicators: false) {
+                if !viewModel.savedFavorites.isEmpty {
                     favoritesSection
+                        .padding(.bottom, 16)
                 }
+
+                settingsIcon
             }
-
-            Spacer(minLength: 0)
-
-            settingsButton
         }
     }
 
@@ -96,62 +96,59 @@ struct BottomSheetContent: View {
         }
     }
 
-    private var settingsButton: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            viewModel.showSettings = true
-        }) {
+    private var settingsIcon: some View {
+        Button(action: onOpenSettings) {
             Image(systemName: "gearshape.fill")
                 .font(.title3)
                 .foregroundColor(AppConstants.Colors.secondaryText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(Color(UIColor.tertiarySystemFill))
-                .cornerRadius(12)
         }
         .buttonStyle(.hapticLight)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Configuring State
 
     private var configuringState: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 8) {
-                cancelPinButton
-                destinationNameField
-                Spacer(minLength: 4)
-                starMenu
-            }
-
-            if viewModel.isLoadingETA {
-                HStack {
-                    ProgressView()
-                        .padding(.trailing, 8)
-                    Text("Calculando ruta…")
-                        .foregroundColor(AppConstants.Colors.secondaryText)
-                    Spacer()
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 16) {
+                HStack(spacing: 8) {
+                    cancelPinButton
+                    destinationNameField
+                    Spacer(minLength: 4)
+                    starMenu
                 }
-            } else if let eta = viewModel.simulatedETA {
-                HStack {
-                    Image(systemName: "clock.fill")
-                        .foregroundColor(AppConstants.Colors.success)
-                    let minutes = max(1, Int(ceil(eta / 60)))
-                    Text("Tiempo de ruta: \(minutes) min")
-                        .fontWeight(.semibold)
-                        .foregroundColor(minutes <= viewModel.leadTime.minutes ? AppConstants.Colors.destructive : AppConstants.Colors.primaryText)
-                    Spacer()
+
+                if viewModel.isLoadingETA {
+                    HStack {
+                        ProgressView()
+                            .padding(.trailing, 8)
+                        Text("Calculando ruta…")
+                            .foregroundColor(AppConstants.Colors.secondaryText)
+                        Spacer()
+                    }
+                } else if let eta = viewModel.simulatedETA {
+                    HStack {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(AppConstants.Colors.success)
+                        let minutes = max(1, Int(ceil(eta / 60)))
+                        Text("Tiempo de ruta: \(minutes) min")
+                            .fontWeight(.semibold)
+                            .foregroundColor(minutes <= viewModel.leadTime.minutes ? AppConstants.Colors.destructive : AppConstants.Colors.primaryText)
+                        Spacer()
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
 
-            LeadTimePickerView(viewModel: viewModel)
+                LeadTimePickerView(viewModel: viewModel)
 
-            PrimaryButton(title: "Iniciar Viaje", icon: "arrow.triangle.turn.up.right.circle.fill") {
-                viewModel.confirmDestinationName()
-                viewModel.activateTrip()
+                PrimaryButton(title: "Iniciar Viaje", icon: "arrow.triangle.turn.up.right.circle.fill") {
+                    viewModel.confirmDestinationName()
+                    viewModel.activateTrip()
+                }
+                .opacity(viewModel.selectedDestination == nil || viewModel.isLoadingETA ? 0.5 : 1.0)
+                .disabled(viewModel.selectedDestination == nil || viewModel.isLoadingETA)
             }
-            .opacity(viewModel.selectedDestination == nil || viewModel.isLoadingETA ? 0.5 : 1.0)
-            .disabled(viewModel.selectedDestination == nil || viewModel.isLoadingETA)
         }
     }
 
