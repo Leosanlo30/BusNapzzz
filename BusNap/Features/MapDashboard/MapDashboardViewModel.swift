@@ -24,6 +24,9 @@ class MapDashboardViewModel {
     var isLoadingETA: Bool = false
     var errorMessage: String? = nil
     var isOffline: Bool = false
+    var destinationName: String = ""
+    var showNameAlert: Bool = false
+    var savedFavorites: [Destination] = []
     
     // Propiedad computada puente para el estado de permisos
     var permissionState: LocationPermissionState {
@@ -66,7 +69,10 @@ class MapDashboardViewModel {
         }
         self.networkMonitor.start()
         
-        // 2. CONECTAMOS EL CABLE DEL GPS AL VIEWMODEL
+        // 2. Cargamos favoritos guardados
+        self.savedFavorites = self.preferencesStore.loadFavorites()
+        
+        // 3. CONECTAMOS EL CABLE DEL GPS AL VIEWMODEL
         self.locationManager.setLocationHandler { [weak self] newLocation in
             guard let self = self else { return }
             Task { @MainActor in
@@ -79,7 +85,32 @@ class MapDashboardViewModel {
     
     func updateDestination(_ destination: Destination) {
         tripEngine.updateDestination(destination)
+        destinationName = destination.name ?? ""
+        showNameAlert = true
         fetchETA(for: destination)
+    }
+    
+    func confirmDestinationName() {
+        let trimmed = destinationName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmed.isEmpty ? "Punto Seleccionado" : trimmed
+        tripEngine.updateDestinationName(name)
+        showNameAlert = false
+    }
+    
+    func saveAsFavorite() {
+        guard let dest = tripEngine.currentDestination else { return }
+        if !savedFavorites.contains(dest) {
+            savedFavorites.append(dest)
+            preferencesStore.saveFavorites(savedFavorites)
+        }
+    }
+    
+    func loadFavorites() {
+        savedFavorites = preferencesStore.loadFavorites()
+    }
+    
+    func selectFavorite(_ dest: Destination) {
+        updateDestination(dest)
     }
     
     func activateTrip() {

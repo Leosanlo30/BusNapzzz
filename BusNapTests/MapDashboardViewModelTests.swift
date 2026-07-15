@@ -180,6 +180,7 @@ struct MapDashboardViewModelTests {
         @MainActor
         final class MockPreferencesStore: UserPreferencesStoring {
             var memoryStorage: AlertLeadTime = .fiveMinutes
+            var favoriteStorage: [Destination] = []
             
             func saveLeadTime(_ time: AlertLeadTime) {
                 memoryStorage = time
@@ -187,6 +188,14 @@ struct MapDashboardViewModelTests {
             
             func loadLeadTime() -> AlertLeadTime {
                 return memoryStorage
+            }
+            
+            func saveFavorites(_ favorites: [Destination]) {
+                favoriteStorage = favorites
+            }
+            
+            func loadFavorites() -> [Destination] {
+                return favoriteStorage
             }
         }
 
