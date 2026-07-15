@@ -5,29 +5,22 @@ struct BottomSheetContent: View {
     @FocusState private var isNameFocused: Bool
 
     var body: some View {
-        NavigationStack {
-            Group {
-                switch viewModel.tripUIState {
-                case .initial:
-                    initialState
-                case .configuring:
-                    configuringState
-                case .active:
-                    activeState
-                case .paused:
-                    pausedState
-                case .finished:
-                    finishedState
-                }
-            }
-            .padding(AppConstants.Layout.standardPadding)
-            .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.tripUIState)
-            .navigationDestination(for: String.self) { value in
-                if value == "settings" {
-                    SettingsView(viewModel: viewModel)
-                }
+        Group {
+            switch viewModel.tripUIState {
+            case .initial:
+                initialState
+            case .configuring:
+                configuringState
+            case .active:
+                activeState
+            case .paused:
+                pausedState
+            case .finished:
+                finishedState
             }
         }
+        .padding(AppConstants.Layout.standardPadding)
+        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.tripUIState)
     }
 
     // MARK: - Initial State
@@ -38,12 +31,14 @@ struct BottomSheetContent: View {
                 .padding(.bottom, 20)
 
             if !viewModel.savedFavorites.isEmpty {
-                favoritesSection
+                ScrollView(.vertical, showsIndicators: false) {
+                    favoritesSection
+                }
             }
 
             Spacer(minLength: 0)
 
-            settingsRow
+            settingsButton
         }
     }
 
@@ -64,6 +59,7 @@ struct BottomSheetContent: View {
         .padding(12)
         .background(Color(UIColor.tertiarySystemFill))
         .cornerRadius(12)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var favoritesSection: some View {
@@ -81,7 +77,7 @@ struct BottomSheetContent: View {
                                 Circle()
                                     .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
                                     .frame(width: 52, height: 52)
-                                Image(systemName: "heart.fill")
+                                Image(systemName: fav.icon ?? "heart.fill")
                                     .font(.title3)
                                     .foregroundColor(AppConstants.Colors.primaryAccent)
                             }
@@ -100,24 +96,18 @@ struct BottomSheetContent: View {
         }
     }
 
-    private var settingsRow: some View {
-        NavigationLink(value: "settings") {
-            HStack {
-                Image(systemName: "gearshape.fill")
-                    .font(.subheadline)
-                    .foregroundColor(AppConstants.Colors.secondaryText)
-                Text("Configuración")
-                    .font(.subheadline)
-                    .foregroundColor(AppConstants.Colors.secondaryText)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundColor(AppConstants.Colors.secondaryText)
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(Color(UIColor.tertiarySystemFill))
-            .cornerRadius(12)
+    private var settingsButton: some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            viewModel.showSettings = true
+        }) {
+            Image(systemName: "gearshape.fill")
+                .font(.title3)
+                .foregroundColor(AppConstants.Colors.secondaryText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Color(UIColor.tertiarySystemFill))
+                .cornerRadius(12)
         }
         .buttonStyle(.hapticLight)
     }
@@ -130,7 +120,7 @@ struct BottomSheetContent: View {
                 cancelPinButton
                 destinationNameField
                 Spacer(minLength: 4)
-                starButton
+                starMenu
             }
 
             if viewModel.isLoadingETA {
@@ -156,7 +146,7 @@ struct BottomSheetContent: View {
 
             LeadTimePickerView(viewModel: viewModel)
 
-            PrimaryButton(title: "Iniciar Viaje") {
+            PrimaryButton(title: "Iniciar Viaje", icon: "arrow.triangle.turn.up.right.circle.fill") {
                 viewModel.confirmDestinationName()
                 viewModel.activateTrip()
             }
@@ -177,9 +167,24 @@ struct BottomSheetContent: View {
         .buttonStyle(.hapticLight)
     }
 
-    private var starButton: some View {
-        Button(action: { viewModel.toggleFavorite() }) {
-            Image(systemName: isCurrentDestinationFavorite ? "star.fill" : "star")
+    private var starMenu: some View {
+        Menu {
+            if viewModel.isCurrentDestinationFavorite() {
+                Button(role: .destructive, action: { viewModel.removeFavorite() }) {
+                    Label("Eliminar favorito", systemImage: "trash")
+                }
+            }
+            Button(action: { viewModel.saveFavorite(icon: "house.fill") }) {
+                Label("Casa", systemImage: "house.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "briefcase.fill") }) {
+                Label("Trabajo", systemImage: "briefcase.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "mappin.and.ellipse") }) {
+                Label("Pin de mapa", systemImage: "mappin.and.ellipse")
+            }
+        } label: {
+            Image(systemName: viewModel.isCurrentDestinationFavorite() ? "star.fill" : "star")
                 .font(.title3)
                 .foregroundColor(AppConstants.Colors.primaryAccent)
                 .frame(width: 36, height: 36)
@@ -187,11 +192,6 @@ struct BottomSheetContent: View {
                 .cornerRadius(10)
         }
         .buttonStyle(.hapticLight)
-    }
-
-    private var isCurrentDestinationFavorite: Bool {
-        guard let dest = viewModel.selectedDestination else { return false }
-        return viewModel.savedFavorites.contains(dest)
     }
 
     private var destinationNameField: some View {
