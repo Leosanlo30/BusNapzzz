@@ -61,4 +61,6 @@ final class TripMathTests: XCTestCase {
         // Then
         XCTAssertTrue(result, "El umbral crítico se debe activar con una distancia menor o igual a 1 km.")
     }
+    
+    
 }

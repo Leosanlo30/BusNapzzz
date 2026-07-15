@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="Xcode">
+    
+    <wpt lat="21.047052" lon="-89.644283">
+        <name>Facultad de Matemáticas</name>
+        <time>2026-07-11T16:00:00Z</time>
+    </wpt>
+    
+    <wpt lat="21.041429" lon="-89.652583">
+        <name>CRIT</name>
+        <time>2026-07-11T16:01:15Z</time> </wpt>
+    
+    <wpt lat="21.036376" lon="-89.654566">
+        <name>Real Montejo</name>
+        <time>2026-07-11T16:01:45Z</time> </wpt>
+    
+    <wpt lat="21.017705" lon="-89.661916">
+        <name>Chenkú</name>
+        <time>2026-07-11T16:03:35Z</time> </wpt>
+    
+    <wpt lat="21.013451" lon="-89.663679">
+        <name>Tec Poniente</name>
+        <time>2026-07-11T16:04:20Z</time> </wpt>
+    
+    <wpt lat="21.005512" lon="-89.667206">
+        <name>San Francisco Porvenir</name>
+        <time>2026-07-11T16:05:05Z</time> </wpt>
+    
+    <wpt lat="20.996613" lon="-89.672962">
+        <name>Jacinto Canek</name>
+        <time>2026-07-11T16:06:15Z</time> </wpt>
+
+</gpx>

@@ -6,57 +6,313 @@
 //
 
 import Foundation
+import SwiftUI
 import Observation
+import CoreLocation
+import MapKit
 
-@Observable //Para que el programa actualice por si misma la pantala cada que se cambie de estado
+@MainActor
+@Observable
 class MapDashboardViewModel {
-    
-    // MARK: - Estado de la Interfaz (Propiedades)
-    
-    var alarmStatus: AlarmStatus = .inactive
-    var selectedDestination: Destination? = nil //opcional al princio (iniciar la app)
+
+    // MARK: - UI State
+    var isPaused: Bool = false
+    var showSheet: Bool = true
+    var selectedDetent: PresentationDetent = .fraction(0.25)
+    var searchText: String = ""
+
+    var tripUIState: TripUIState {
+        TripUIState.from(engineState: tripEngine.state, isPaused: isPaused)
+    }
+
+    var alarmStatus: TripState { tripEngine.state }
+    var selectedDestination: Destination? { tripEngine.currentDestination }
+
+    var simulatedETA: TimeInterval? = nil
     var leadTime: AlertLeadTime = .fiveMinutes
-    var simulatedETA: Int? = nil // Representado en minutos | opcional al princio (iniciar la app)
-    
-    // MARK: - Intenciones (Mutaciones de Estado)
-    
-    /// Actualiza el destino seleccionado por el usuario
+    var isLoadingETA: Bool = false
+    var errorMessage: String? = nil
+    var isOffline: Bool = false
+    var destinationName: String = ""
+    var savedFavorites: [Destination] = []
+
+    @ObservationIgnored @AppStorage("vibrationEnabled") var vibrationEnabled = true
+    var ringtoneName: String = "Alarm" {
+        didSet { UserDefaults.standard.set(ringtoneName, forKey: "ringtoneName") }
+    }
+    @ObservationIgnored @AppStorage("customLeadTime") var customLeadTimeMinutes = 10
+
+    @ObservationIgnored @AppStorage("appTheme") private var appThemeRaw = AppTheme.liquidGlass.rawValue
+
+    var selectedTheme: AppTheme {
+        get { AppTheme(rawValue: appThemeRaw) ?? .liquidGlass }
+        set {
+            appThemeRaw = newValue.rawValue
+            preferencesStore.saveTheme(newValue)
+        }
+    }
+
+    var currentDetents: Set<PresentationDetent> {
+        [.fraction(0.25), .medium, .large]
+    }
+
+    var defaultDetent: PresentationDetent {
+        switch tripUIState {
+        case .initial:     return .fraction(0.25)
+        case .configuring: return .medium
+        case .active:      return .fraction(0.25)
+        case .paused:      return .fraction(0.25)
+        case .finished:    return .fraction(0.35)
+        }
+    }
+
+    // MARK: - Dependencies
+    @ObservationIgnored private let routeEstimator: RouteEstimating
+    @ObservationIgnored private let preferencesStore: UserPreferencesStoring
+    @ObservationIgnored private let networkMonitor: NetworkMonitoring
+    @ObservationIgnored private let locationManager: LocationManaging
+    @ObservationIgnored private let tripEngine: TripEngine
+
+    @ObservationIgnored private var lastETARequestTime: Date = .distantPast
+    @ObservationIgnored private var isAppInBackground: Bool = false
+    @ObservationIgnored private var isFetchingETA: Bool = false
+
+    init(routeEstimator: RouteEstimating? = nil,
+         preferencesStore: UserPreferencesStoring? = nil,
+         networkMonitor: NetworkMonitoring? = nil,
+         locationManager: LocationManaging? = nil,
+         tripEngine: TripEngine? = nil) {
+
+        self.routeEstimator = routeEstimator ?? MapKitRouteEstimator()
+        self.preferencesStore = preferencesStore ?? UserDefaultsPreferencesStore()
+        self.networkMonitor = networkMonitor ?? NetworkMonitor()
+        self.locationManager = locationManager ?? LocationManager()
+        self.tripEngine = tripEngine ?? TripEngine()
+
+        self.leadTime = self.preferencesStore.loadLeadTime()
+        self.ringtoneName = UserDefaults.standard.string(forKey: "ringtoneName") ?? "Alarm"
+        let storedTheme = self.preferencesStore.loadTheme()
+        if storedTheme.rawValue != self.appThemeRaw {
+            self.appThemeRaw = storedTheme.rawValue
+        }
+
+        self.networkMonitor.setStatusHandler { [weak self] offline in
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.isOffline = offline
+            }
+        }
+        self.networkMonitor.start()
+
+        self.savedFavorites = self.preferencesStore.loadFavorites()
+
+        self.locationManager.setLocationHandler { [weak self] newLocation in
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.processLocationUpdate(newLocation)
+            }
+        }
+    }
+
+    // MARK: - Sheet Detent Management
+
+    func updateDetentForCurrentState() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            selectedDetent = defaultDetent
+        }
+    }
+
+    // MARK: - User Intentions
+
     func updateDestination(_ destination: Destination) {
-        self.selectedDestination = destination
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            tripEngine.updateDestination(destination)
+            destinationName = destination.name ?? ""
+            fetchETA(for: destination)
+            updateDetentForCurrentState()
+        }
     }
-    
-    /// Modifica el tiempo de anticipación para la alarma
-    func updateLeadTime(_ time: AlertLeadTime) {
-        self.leadTime = time
+
+    func confirmDestinationName() {
+        let trimmed = destinationName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmed.isEmpty ? "Punto Seleccionado" : trimmed
+        tripEngine.updateDestinationName(name)
     }
-    
-    /// Inicia el flujo de viaje, simulando la transición de estados
+
+    func saveFavorite(icon: String) {
+        guard let dest = tripEngine.currentDestination else { return }
+        var saved = dest
+        saved.icon = icon
+        if let index = savedFavorites.firstIndex(of: dest) {
+            savedFavorites[index] = saved
+        } else {
+            savedFavorites.append(saved)
+        }
+        preferencesStore.saveFavorites(savedFavorites)
+    }
+
+    func removeFavorite() {
+        guard let dest = tripEngine.currentDestination else { return }
+        savedFavorites.removeAll { $0 == dest }
+        preferencesStore.saveFavorites(savedFavorites)
+    }
+
+    func isCurrentDestinationFavorite() -> Bool {
+        guard let dest = tripEngine.currentDestination else { return false }
+        return savedFavorites.contains(dest)
+    }
+
+    func clearDestination() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            tripEngine.cancelTrip()
+            simulatedETA = nil
+            errorMessage = nil
+            destinationName = ""
+            searchText = ""
+            updateDetentForCurrentState()
+        }
+    }
+
+    func loadFavorites() {
+        savedFavorites = preferencesStore.loadFavorites()
+    }
+
+    func selectFavorite(_ dest: Destination) {
+        updateDestination(dest)
+    }
+
     func activateTrip() {
-        // Bloqueo de seguridad: no podemos activar sin destino
-        guard selectedDestination != nil else {
-            print("Error: Intento de activar viaje sin destino.")
+        guard let destination = tripEngine.currentDestination else { return }
+
+        if permissionState == .notDetermined {
+            locationManager.requestAlwaysAuthorization()
             return
         }
-        
-        // Pasamos al estado configurado
-        alarmStatus = .configured
-        
-        //Simulamos que el motor arranca y pasamos a monitorear
-        //inicio del loop principal.
-        alarmStatus = .monitoring
-        
-        // Simulamos un ETA inicial (ej. 45 minutos)
-        simulatedETA = 45
-        
-        print("Viaje activado hacia: \(selectedDestination?.name ?? "Desconocido")")
+
+        if permissionState == .denied || permissionState == .restricted {
+            errorMessage = "No podemos activar la alarma sin acceso al GPS."
+            return
+        }
+
+        if permissionState == .authorizedWhenInUse {
+            errorMessage = "La alarma requiere permiso 'Siempre' para funcionar en segundo plano."
+            return
+        }
+
+        AudioManager.shared.prepareAudioEngine()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            tripEngine.startTrip(to: destination, leadTime: leadTime)
+            isPaused = false
+            errorMessage = nil
+            updateDetentForCurrentState()
+        }
     }
-    
-    /// Cancela el viaje activo y resetea los valores al estado inactivo
+
+    func pauseTrip() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            isPaused = true
+        }
+    }
+
+    func resumeTrip() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            isPaused = false
+            if let destination = selectedDestination {
+                lastETARequestTime = Date()
+                fetchETA(for: destination)
+            }
+        }
+    }
+
     func cancelTrip() {
-        alarmStatus = .inactive
-        selectedDestination = nil
-        simulatedETA = nil
-        
-        print("Viaje cancelado. Sistema inactivo.")
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            tripEngine.cancelTrip()
+            simulatedETA = nil
+            errorMessage = nil
+            isPaused = false
+            lastETARequestTime = .distantPast
+            updateDetentForCurrentState()
+        }
+    }
+
+    func dismissFinished() {
+        cancelTrip()
+    }
+
+    func updateLeadTime(_ newTime: AlertLeadTime) {
+        self.leadTime = newTime
+        preferencesStore.saveLeadTime(newTime)
+    }
+
+    func updateTheme(_ theme: AppTheme) {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            selectedTheme = theme
+        }
+    }
+
+    // MARK: - Private
+
+    private func fetchETA(for destination: Destination, from currentLocation: CLLocation? = nil) {
+        guard !isFetchingETA else { return }
+        isFetchingETA = true
+        if simulatedETA == nil { isLoadingETA = true }
+        errorMessage = nil
+
+        Task {
+            do {
+                let estimate = try await routeEstimator.estimateRoute(to: destination, from: currentLocation)
+                self.simulatedETA = estimate.expectedTravelTime
+                self.isLoadingETA = false
+                self.isFetchingETA = false
+            } catch {
+                self.errorMessage = error.localizedDescription
+                self.isLoadingETA = false
+                self.isFetchingETA = false
+            }
+        }
+    }
+
+    private func processLocationUpdate(_ location: CLLocation) {
+        guard tripEngine.state == .monitoring || tripEngine.state == .criticalZone,
+              let destination = selectedDestination,
+              !isPaused else { return }
+
+        guard !isAppInBackground else { return }
+
+        let now = Date()
+        if now.timeIntervalSince(lastETARequestTime) >= 60 {
+            lastETARequestTime = now
+            fetchETA(for: destination)
+        }
+    }
+
+    // MARK: - Energy Management
+
+    func handleScenePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .background:
+            isAppInBackground = true
+            locationManager.enableEcoMode()
+
+        case .active:
+            isAppInBackground = false
+            locationManager.disableEcoMode()
+
+            if (tripEngine.state == .monitoring || tripEngine.state == .criticalZone),
+               let destination = selectedDestination,
+               !isPaused {
+                lastETARequestTime = Date()
+                fetchETA(for: destination)
+            }
+
+        default:
+            break
+        }
+    }
+}
+
+extension MapDashboardViewModel {
+    var permissionState: LocationPermissionState {
+        locationManager.permissionState
     }
 }
