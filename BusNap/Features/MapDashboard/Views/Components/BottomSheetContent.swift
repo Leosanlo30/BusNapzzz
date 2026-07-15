@@ -5,33 +5,45 @@ struct BottomSheetContent: View {
     @FocusState private var isNameFocused: Bool
 
     var body: some View {
-        Group {
-            switch viewModel.tripUIState {
-            case .initial:
-                initialState
-            case .configuring:
-                configuringState
-            case .active:
-                activeState
-            case .paused:
-                pausedState
-            case .finished:
-                finishedState
+        NavigationStack {
+            Group {
+                switch viewModel.tripUIState {
+                case .initial:
+                    initialState
+                case .configuring:
+                    configuringState
+                case .active:
+                    activeState
+                case .paused:
+                    pausedState
+                case .finished:
+                    finishedState
+                }
+            }
+            .padding(AppConstants.Layout.standardPadding)
+            .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.tripUIState)
+            .navigationDestination(for: String.self) { value in
+                if value == "settings" {
+                    SettingsView(viewModel: viewModel)
+                }
             }
         }
-        .padding(AppConstants.Layout.standardPadding)
-        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.tripUIState)
     }
 
     // MARK: - Initial State
 
     private var initialState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             searchBar
+                .padding(.bottom, 20)
 
             if !viewModel.savedFavorites.isEmpty {
                 favoritesSection
             }
+
+            Spacer(minLength: 0)
+
+            settingsRow
         }
     }
 
@@ -88,13 +100,36 @@ struct BottomSheetContent: View {
         }
     }
 
+    private var settingsRow: some View {
+        NavigationLink(value: "settings") {
+            HStack {
+                Image(systemName: "gearshape.fill")
+                    .font(.subheadline)
+                    .foregroundColor(AppConstants.Colors.secondaryText)
+                Text("Configuración")
+                    .font(.subheadline)
+                    .foregroundColor(AppConstants.Colors.secondaryText)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(AppConstants.Colors.secondaryText)
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(Color(UIColor.tertiarySystemFill))
+            .cornerRadius(12)
+        }
+        .buttonStyle(.hapticLight)
+    }
+
     // MARK: - Configuring State
 
     private var configuringState: some View {
         VStack(spacing: 16) {
-            HStack {
+            HStack(spacing: 8) {
+                cancelPinButton
                 destinationNameField
-                Spacer(minLength: 8)
+                Spacer(minLength: 4)
                 starButton
             }
 
@@ -130,14 +165,26 @@ struct BottomSheetContent: View {
         }
     }
 
+    private var cancelPinButton: some View {
+        Button(action: { viewModel.clearDestination() }) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.title3)
+                .foregroundColor(.secondary)
+                .frame(width: 36, height: 36)
+                .background(Color(UIColor.tertiarySystemFill))
+                .cornerRadius(10)
+        }
+        .buttonStyle(.hapticLight)
+    }
+
     private var starButton: some View {
         Button(action: { viewModel.toggleFavorite() }) {
             Image(systemName: isCurrentDestinationFavorite ? "star.fill" : "star")
-                .font(.title2)
+                .font(.title3)
                 .foregroundColor(AppConstants.Colors.primaryAccent)
-                .frame(width: 44, height: 44)
+                .frame(width: 36, height: 36)
                 .background(AppConstants.Colors.primaryAccent.opacity(0.12))
-                .cornerRadius(12)
+                .cornerRadius(10)
         }
         .buttonStyle(.hapticLight)
     }

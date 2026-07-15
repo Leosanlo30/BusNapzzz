@@ -42,7 +42,7 @@ enum AlertLeadTime: Codable, Equatable, Identifiable {
     var displayTitle: String {
         switch self {
         case .custom(let minutes):
-            return "Personalizado (\(minutes) min)"
+            return "\(minutes) minutos"
         default:
             return "\(minutes) minutos antes"
         }

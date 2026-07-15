@@ -9,10 +9,6 @@ struct MapDashboardView: View {
         ZStack(alignment: .topTrailing) {
             DestinationMapView(viewModel: viewModel)
 
-            settingsButton
-                .padding(16)
-                .zIndex(2)
-
             if viewModel.isOffline {
                 offlineBanner
                     .zIndex(1)
@@ -33,24 +29,6 @@ struct MapDashboardView: View {
                         : AnyShapeStyle(Material.regularMaterial)
                 )
         }
-        .sheet(isPresented: $viewModel.showSettings) {
-            SettingsView(viewModel: viewModel)
-        }
-    }
-
-    private var settingsButton: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            viewModel.showSettings = true
-        }) {
-            Image(systemName: "gearshape.fill")
-                .font(.title3)
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .background(.ultraThinMaterial)
-                .clipShape(Circle())
-        }
-        .buttonStyle(.hapticLight)
     }
 
     private var offlineBanner: some View {

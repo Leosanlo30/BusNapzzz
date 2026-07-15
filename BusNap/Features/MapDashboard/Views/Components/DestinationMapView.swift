@@ -47,7 +47,7 @@ struct DestinationMapView: View {
                 MapCompass()
                 MapPitchToggle()
             }
-            .safeAreaPadding(.top, 80)
+            .safeAreaPadding(.top, 100)
         }
         .ignoresSafeArea(edges: .all)
     }
