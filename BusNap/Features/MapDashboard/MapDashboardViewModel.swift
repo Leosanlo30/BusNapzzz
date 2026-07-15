@@ -17,9 +17,8 @@ class MapDashboardViewModel {
 
     // MARK: - UI State
     var isPaused: Bool = false
-    var showSettings: Bool = false
     var showSheet: Bool = true
-    var selectedDetent: PresentationDetent = .fraction(0.2)
+    var selectedDetent: PresentationDetent = .fraction(0.25)
     var searchText: String = ""
 
     var tripUIState: TripUIState {
@@ -37,30 +36,32 @@ class MapDashboardViewModel {
     var destinationName: String = ""
     var savedFavorites: [Destination] = []
 
-    var vibrationEnabled: Bool = true {
-        didSet { UserDefaults.standard.set(vibrationEnabled, forKey: "vibrationEnabled") }
-    }
+    @ObservationIgnored @AppStorage("vibrationEnabled") var vibrationEnabled = true
     var ringtoneName: String = "Alarm" {
         didSet { UserDefaults.standard.set(ringtoneName, forKey: "ringtoneName") }
     }
-    var customLeadTimeMinutes: Int = 10 {
-        didSet { UserDefaults.standard.set(customLeadTimeMinutes, forKey: "customLeadTimeMinutes") }
-    }
+    @ObservationIgnored @AppStorage("customLeadTime") var customLeadTimeMinutes = 10
 
-    var selectedTheme: AppTheme = .liquidGlass {
-        didSet { preferencesStore.saveTheme(selectedTheme) }
+    @ObservationIgnored @AppStorage("appTheme") private var appThemeRaw = AppTheme.liquidGlass.rawValue
+
+    var selectedTheme: AppTheme {
+        get { AppTheme(rawValue: appThemeRaw) ?? .liquidGlass }
+        set {
+            appThemeRaw = newValue.rawValue
+            preferencesStore.saveTheme(newValue)
+        }
     }
 
     var currentDetents: Set<PresentationDetent> {
-        [.fraction(0.2), .medium, .large]
+        [.fraction(0.25), .medium, .large]
     }
 
     var defaultDetent: PresentationDetent {
         switch tripUIState {
-        case .initial:     return .fraction(0.2)
+        case .initial:     return .fraction(0.25)
         case .configuring: return .medium
-        case .active:      return .fraction(0.2)
-        case .paused:      return .fraction(0.2)
+        case .active:      return .fraction(0.25)
+        case .paused:      return .fraction(0.25)
         case .finished:    return .fraction(0.35)
         }
     }
@@ -89,11 +90,11 @@ class MapDashboardViewModel {
         self.tripEngine = tripEngine ?? TripEngine()
 
         self.leadTime = self.preferencesStore.loadLeadTime()
-        self.selectedTheme = self.preferencesStore.loadTheme()
-        self.vibrationEnabled = UserDefaults.standard.bool(forKey: "vibrationEnabled")
         self.ringtoneName = UserDefaults.standard.string(forKey: "ringtoneName") ?? "Alarm"
-        self.customLeadTimeMinutes = UserDefaults.standard.integer(forKey: "customLeadTimeMinutes")
-        if self.customLeadTimeMinutes == 0 { self.customLeadTimeMinutes = 10 }
+        let storedTheme = self.preferencesStore.loadTheme()
+        if storedTheme.rawValue != self.appThemeRaw {
+            self.appThemeRaw = storedTheme.rawValue
+        }
 
         self.networkMonitor.setStatusHandler { [weak self] offline in
             guard let self = self else { return }
