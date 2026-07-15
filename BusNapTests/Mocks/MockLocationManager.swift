@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 @testable import BusNap
 
 // Aislamos el Mock en el MainActor para cumplir el contrato seguro del protocolo
@@ -23,7 +24,18 @@ final class MockLocationManager: LocationManaging {
     
     func requestWhenInUseAuthorization() {
         didRequestAuthorization = true
-        // En un test, no levantamos el diálogo de Apple.
-        // Simplemente registramos que la intención ocurrió.
+    }
+    
+    func requestAlwaysAuthorization() {
+        didRequestAuthorization = true
+        permissionState = .authorizedAlways
+    }
+    
+    func enableEcoMode() {}
+    
+    func disableEcoMode() {}
+    
+    func setLocationHandler(_ handler: @escaping (CLLocation) -> Void) {
+        // Mock: no hacemos nada con el handler
     }
 }

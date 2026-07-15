@@ -2,9 +2,10 @@ import Foundation
 import SwiftUI
 
 struct BottomSheetView: View {
-    var viewModel: MapDashboardViewModel
+    @Bindable var viewModel: MapDashboardViewModel
     
-    // Propiedad computada para saber si estamos en estado de "espera de usuario"
+    @FocusState private var isNameFocused: Bool
+    
     var isWaitingForUser: Bool {
         viewModel.alarmStatus == .idle || viewModel.alarmStatus == .configured
     }
@@ -12,106 +13,178 @@ struct BottomSheetView: View {
     var body: some View {
         VStack(spacing: 16) {
             
-            // 1. Título dinámico
-            Text(isWaitingForUser ? "Configura tu Viaje" : "Monitoreando Viaje")
-                .font(.title2)
-                .fontWeight(.bold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            // 2. Información del destino
+            // 1. Header: close button + title
             HStack {
-                Image(systemName: "mappin.and.ellipse")
-                    .foregroundColor(AppConstants.Colors.primaryAccent)
-                
-                if let destination = viewModel.selectedDestination {
-                    Text(destination.name ?? "Destino seleccionado")
-                        .fontWeight(.medium)
-                } else {
-                    Text("Selecciona un destino en el mapa")
-                        .foregroundColor(AppConstants.Colors.secondaryText)
+                if !isWaitingForUser {
+                    Button(action: { viewModel.cancelTrip() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 Spacer()
+                Text(isWaitingForUser ? "Coloco pin" : "Viaje iniciado")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Spacer()
+                if isWaitingForUser, viewModel.selectedDestination != nil {
+                    Button(action: { viewModel.saveAsFavorite() }) {
+                        Image(systemName: viewModel.savedFavorites.contains(where: { $0.latitude == viewModel.selectedDestination?.latitude && $0.longitude == viewModel.selectedDestination?.longitude }) ? "heart.fill" : "heart")
+                            .font(.title3)
+                            .foregroundColor(AppConstants.Colors.primaryAccent)
+                    }
+                }
             }
             
-            // 3. Selector de tiempo (Solo si no estamos monitoreando)
             if isWaitingForUser {
-                LeadTimePickerView(viewModel: viewModel)
-                    .padding(.top, 4)
+                // 2. Nombre de ubicación
+                HStack {
+                    Image(systemName: "mappin.and.ellipse")
+                        .foregroundColor(AppConstants.Colors.primaryAccent)
+                    TextField("Nombre ubicación", text: $viewModel.destinationName)
+                        .fontWeight(.medium)
+                        .focused($isNameFocused)
+                        .submitLabel(.done)
+                        .onSubmit { viewModel.confirmDestinationName() }
+                    if !viewModel.destinationName.isEmpty {
+                        Button(action: {
+                            viewModel.destinationName = ""
+                            viewModel.confirmDestinationName()
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(Color(UIColor.tertiarySystemFill))
+                .cornerRadius(10)
                 
-                Button("🎵 Probar Altavoz") {
+                // 3. Tiempo de ruta
+                Group {
+                    if viewModel.isLoadingETA {
+                        HStack {
+                            ProgressView()
+                                .padding(.trailing, 8)
+                            Text("Calculando ruta...")
+                                .foregroundColor(AppConstants.Colors.secondaryText)
+                                .fontWeight(.medium)
+                            Spacer()
+                        }
+                    } else if let eta = viewModel.simulatedETA {
+                        HStack {
+                            Image(systemName: "clock.fill")
+                                .foregroundColor(.green)
+                            let minutes = max(1, Int(ceil(eta / 60)))
+                            Text("Tiempo de ruta: \(minutes) min")
+                                .fontWeight(.semibold)
+                                .foregroundColor(minutes <= viewModel.leadTime.minutes ? .red : .primary)
+                            Spacer()
+                        }
+                    }
+                }
+                
+                // 4. Lead time picker
+                LeadTimePickerView(viewModel: viewModel)
+                
+                // 5. Test speaker
+                Button(action: {
                     AudioManager.shared.playAlarm()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
                         AudioManager.shared.stopAlarm()
                     }
-                }
-                .font(.caption)
-                .foregroundColor(.blue)
-                .padding(.top, 2)
-            }
-            
-            // 4. Bloque de Advertencias Críticas (Se queda en medio si ocurren errores)
-            VStack(spacing: 12) {
-                if viewModel.permissionState == .denied || viewModel.permissionState == .restricted {
-                    WarningBanner(
-                        icon: "location.slash.fill",
-                        message: "GPS denegado. Ve a Configuración de iOS para permitir el acceso."
-                    )
-                } else if viewModel.permissionState == .authorizedWhenInUse && !isWaitingForUser {
-                    WarningBanner(
-                        icon: "exclamationmark.shield.fill",
-                        message: "¡Cuidado! Si bloqueas la pantalla, la alarma podría no sonar. Otorga permiso 'Siempre'."
-                    )
+                }) {
+                    HStack {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .font(.caption)
+                        Text("Probar Altavoz")
+                            .font(.caption)
+                    }
+                    .foregroundColor(AppConstants.Colors.primaryAccent)
                 }
                 
-                if viewModel.isOffline {
-                    WarningBanner(
-                        icon: "wifi.slash",
-                        message: "Sin conexión. El cálculo podría fallar."
-                    )
+                // 6. Favorites
+                if !viewModel.savedFavorites.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(viewModel.savedFavorites, id: \.self) { fav in
+                                Button(action: { viewModel.selectFavorite(fav) }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "heart.fill")
+                                            .font(.caption2)
+                                        Text(fav.name ?? "Favorito")
+                                            .font(.caption)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(AppConstants.Colors.primaryAccent.opacity(0.15))
+                                    .foregroundColor(AppConstants.Colors.primaryAccent)
+                                    .cornerRadius(16)
+                                }
+                            }
+                        }
+                    }
                 }
                 
-                if let error = viewModel.errorMessage {
-                    WarningBanner(icon: "exclamationmark.triangle.fill", message: error)
-                }
-            }
-            
-            // 5. ¡MOVIDO AQUÍ! Información del Tiempo Real Vial (Justo arriba del botón)
-            Group {
-                if viewModel.isLoadingETA {
-                    HStack {
-                        ProgressView()
-                            .padding(.trailing, 8)
-                        Text("Calculando ruta...")
-                            .foregroundColor(AppConstants.Colors.secondaryText)
-                            .fontWeight(.medium)
-                        Spacer()
-                    }
-                } else if let eta = viewModel.simulatedETA {
-                    HStack {
-                        Image(systemName: "clock.fill")
-                            .foregroundColor(.green)
-                        
-                        let minutes = max(1, Int(ceil(eta / 60)))
-                        
-                        Text("Tiempo de ruta: \(minutes) min")
-                            .fontWeight(.semibold)
-                            .foregroundColor(minutes <= viewModel.leadTime.minutes ? .red : .primary)
-                        
-                        Spacer()
-                    }
-                }
-            }
-            .padding(.top, 4) // Pequeña separación estética antes de llegar al botón
-            
-            // 6. Botón de Acción Principal
-            if isWaitingForUser {
+                // 7. Action button
                 PrimaryButton(title: "Activar Alarma") {
+                    viewModel.confirmDestinationName()
                     viewModel.activateTrip()
                 }
                 .opacity(viewModel.selectedDestination == nil || viewModel.isLoadingETA || viewModel.permissionState == .denied ? 0.5 : 1.0)
                 .disabled(viewModel.selectedDestination == nil || viewModel.isLoadingETA || viewModel.permissionState == .denied)
                 
             } else {
+                // 2. Monitoring state: nombre + info
+                HStack {
+                    Image(systemName: "mappin.and.ellipse")
+                        .foregroundColor(AppConstants.Colors.primaryAccent)
+                    if let destination = viewModel.selectedDestination {
+                        Text(destination.name ?? "Destino seleccionado")
+                            .fontWeight(.medium)
+                    }
+                    Spacer()
+                }
+                
+                // 3. Tiempo de ruta (actualizable durante el viaje)
+                Group {
+                    if viewModel.isLoadingETA {
+                        HStack {
+                            ProgressView()
+                                .padding(.trailing, 8)
+                            Text("Actualizando ruta...")
+                                .foregroundColor(AppConstants.Colors.secondaryText)
+                            Spacer()
+                        }
+                    } else if let eta = viewModel.simulatedETA {
+                        HStack {
+                            Image(systemName: "clock.fill")
+                                .foregroundColor(.green)
+                            let minutes = max(1, Int(ceil(eta / 60)))
+                            Text("Tiempo de viaje: \(minutes) min")
+                                .fontWeight(.semibold)
+                                .foregroundColor(minutes <= viewModel.leadTime.minutes ? .red : .primary)
+                            Spacer()
+                        }
+                    }
+                }
+                
+                // 4. Advertencias
+                VStack(spacing: 12) {
+                    if viewModel.permissionState == .denied || viewModel.permissionState == .restricted {
+                        WarningBanner(icon: "location.slash.fill", message: "GPS denegado. Ve a Configuración de iOS para permitir el acceso.")
+                    } else if viewModel.permissionState == .authorizedWhenInUse {
+                        WarningBanner(icon: "exclamationmark.shield.fill", message: "¡Cuidado! Si bloqueas la pantalla, la alarma podría no sonar. Otorga permiso 'Siempre'.")
+                    }
+                    if viewModel.isOffline {
+                        WarningBanner(icon: "wifi.slash", message: "Sin conexión. El cálculo podría fallar.")
+                    }
+                    if let error = viewModel.errorMessage {
+                        WarningBanner(icon: "exclamationmark.triangle.fill", message: error)
+                    }
+                }
+                
+                // 5. Cancel button
                 PrimaryButton(title: "Cancelar Viaje") {
                     viewModel.cancelTrip()
                 }
@@ -120,11 +193,16 @@ struct BottomSheetView: View {
         .padding(AppConstants.Layout.standardPadding)
         .background(AppConstants.Colors.background)
         .cornerRadius(AppConstants.Layout.cornerRadius)
-        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: -5)
+        .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: -4)
+        .alert("Nombre del destino", isPresented: $viewModel.showNameAlert) {
+            TextField("Nombre", text: $viewModel.destinationName)
+            Button("Guardar") { viewModel.confirmDestinationName() }
+            Button("Cancelar", role: .cancel) { viewModel.showNameAlert = false }
+        } message: {
+            Text("Escribe un nombre para este destino")
+        }
     }
     
-    // MARK: - Subvistas
-
     struct WarningBanner: View {
         let icon: String
         let message: String

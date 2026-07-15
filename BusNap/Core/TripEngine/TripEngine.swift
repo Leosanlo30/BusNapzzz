@@ -67,34 +67,31 @@ final class TripEngine {
         cancelActiveTask()
         self.currentDestination = nil
         
-        // Limpieza absoluta
         geofenceMonitor.stopMonitoring()
         notificationManager.cancelPendingAlarms()
         
-        AudioManager.shared.stopAlarm()//alarma cancelada
+        AudioManager.shared.stopAlarm()
         
-        Task { @MainActor in
-            self.state = .idle
-        }
+        self.state = .idle
     }
     
     func updateDestination(_ newDestination: Destination) {
-            self.currentDestination = newDestination
-            
-            // CORRECCIÓN: Si el usuario toca el mapa, detenemos cualquier viaje activo.
-            // Esto obliga a que el usuario tenga que presionar "Activar Viaje"
-            // explícitamente para el nuevo punto.
-            if state == .monitoring || state == .criticalZone {
-                geofenceMonitor.stopMonitoring()
-                notificationManager.cancelPendingAlarms()
-                cancelActiveTask()
-            }
-            
-            // Siempre regresamos al estado de configuración, esperando el botón.
-            Task { @MainActor in
-                self.state = .configured
-            }
+        self.currentDestination = newDestination
+        
+        if state == .monitoring || state == .criticalZone {
+            geofenceMonitor.stopMonitoring()
+            notificationManager.cancelPendingAlarms()
+            cancelActiveTask()
         }
+        
+        self.state = .configured
+    }
+    
+    func updateDestinationName(_ name: String) {
+        guard var dest = currentDestination else { return }
+        dest.name = name
+        self.currentDestination = dest
+    }
     
     // MARK: - Manejadores de Eventos
     

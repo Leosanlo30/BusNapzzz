@@ -10,4 +10,6 @@ import Foundation
 protocol UserPreferencesStoring: Sendable {
     func saveLeadTime(_ time: AlertLeadTime)
     func loadLeadTime() -> AlertLeadTime
+    func saveFavorites(_ favorites: [Destination])
+    func loadFavorites() -> [Destination]
 }

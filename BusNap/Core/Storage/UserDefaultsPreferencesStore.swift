@@ -9,6 +9,7 @@ import Foundation
 
 struct UserDefaultsPreferencesStore: UserPreferencesStoring {
     private let leadTimeKey = "com.busnap.app.preferences.leadTime"
+    private let favoritesKey = "com.busnap.app.preferences.favorites"
     
     func saveLeadTime(_ time: AlertLeadTime) {
         // Como tu enum tiene un valor asociado (.custom), lo convertimos a Data (JSON)
@@ -26,5 +27,19 @@ struct UserDefaultsPreferencesStore: UserPreferencesStoring {
         
         // Si es la primera vez que el usuario abre la app o hay un error, retornamos tu preset por defecto
         return .fiveMinutes
+    }
+    
+    func saveFavorites(_ favorites: [Destination]) {
+        if let encoded = try? JSONEncoder().encode(favorites) {
+            UserDefaults.standard.set(encoded, forKey: favoritesKey)
+        }
+    }
+    
+    func loadFavorites() -> [Destination] {
+        if let savedData = UserDefaults.standard.data(forKey: favoritesKey),
+           let decoded = try? JSONDecoder().decode([Destination].self, from: savedData) {
+            return decoded
+        }
+        return []
     }
 }
