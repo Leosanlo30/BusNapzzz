@@ -10,22 +10,19 @@ import Foundation
 struct UserDefaultsPreferencesStore: UserPreferencesStoring {
     private let leadTimeKey = "com.busnap.app.preferences.leadTime"
     private let favoritesKey = "com.busnap.app.preferences.favorites"
+    private let themeKey = "com.busnap.app.preferences.theme"
     
     func saveLeadTime(_ time: AlertLeadTime) {
-        // Como tu enum tiene un valor asociado (.custom), lo convertimos a Data (JSON)
         if let encoded = try? JSONEncoder().encode(time) {
             UserDefaults.standard.set(encoded, forKey: leadTimeKey)
         }
     }
     
     func loadLeadTime() -> AlertLeadTime {
-        // Leemos la Data guardada y la decodificamos de vuelta a tu Enum
         if let savedData = UserDefaults.standard.data(forKey: leadTimeKey),
            let decoded = try? JSONDecoder().decode(AlertLeadTime.self, from: savedData) {
             return decoded
         }
-        
-        // Si es la primera vez que el usuario abre la app o hay un error, retornamos tu preset por defecto
         return .fiveMinutes
     }
     
@@ -41,5 +38,17 @@ struct UserDefaultsPreferencesStore: UserPreferencesStoring {
             return decoded
         }
         return []
+    }
+    
+    func saveTheme(_ theme: AppTheme) {
+        UserDefaults.standard.set(theme.rawValue, forKey: themeKey)
+    }
+    
+    func loadTheme() -> AppTheme {
+        guard let raw = UserDefaults.standard.string(forKey: themeKey),
+              let theme = AppTheme(rawValue: raw) else {
+            return .liquidGlass
+        }
+        return theme
     }
 }

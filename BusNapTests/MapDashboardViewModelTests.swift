@@ -181,6 +181,7 @@ struct MapDashboardViewModelTests {
         final class MockPreferencesStore: UserPreferencesStoring {
             var memoryStorage: AlertLeadTime = .fiveMinutes
             var favoriteStorage: [Destination] = []
+            var themeStorage: AppTheme = .liquidGlass
             
             func saveLeadTime(_ time: AlertLeadTime) {
                 memoryStorage = time
@@ -196,6 +197,14 @@ struct MapDashboardViewModelTests {
             
             func loadFavorites() -> [Destination] {
                 return favoriteStorage
+            }
+
+            func saveTheme(_ theme: AppTheme) {
+                themeStorage = theme
+            }
+
+            func loadTheme() -> AppTheme {
+                return themeStorage
             }
         }
 

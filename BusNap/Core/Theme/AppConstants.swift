@@ -8,32 +8,52 @@
 import Foundation
 import SwiftUI
 
+enum AppTheme: String, CaseIterable, Codable, Sendable {
+    case light
+    case dark
+    case liquidGlass
+
+    var displayName: String {
+        switch self {
+        case .light: return "Light"
+        case .dark: return "Dark"
+        case .liquidGlass: return "Liquid Glass"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.fill"
+        case .liquidGlass: return "drop.fill"
+        }
+    }
+}
 
 enum AppConstants {
     
-    enum Colors{
+    enum Colors {
         
-        //Color principal
-        static let primaryAccent = Color(UIColor.systemBlue)
+        static let primaryAccent = Color.accentColor
         
-        //Colores de fondo
         static let background = Color(UIColor.systemBackground)
         static let secondaryBackground = Color(UIColor.secondarySystemBackground)
         
-        //Colores del texto
-        
         static let primaryText = Color.primary
         static let secondaryText = Color.secondary
+
+        static let success = Color.green
+        static let warning = Color.orange
+        static let destructive = Color.red
         
     }
     
-    //Medidas del Layout
-    enum Layout{
+    enum Layout {
         
         static let cornerRadius: CGFloat = 16.0
         static let standardPadding: CGFloat = 16.0
         static let buttonHeight: CGFloat = 56.0
-        
+        static let smallButtonHeight: CGFloat = 44.0
         
     }
     
