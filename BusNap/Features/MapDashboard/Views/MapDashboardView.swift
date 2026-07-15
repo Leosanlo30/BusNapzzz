@@ -26,8 +26,12 @@ struct MapDashboardView: View {
                     selection: $viewModel.selectedDetent
                 )
                 .presentationDragIndicator(.visible)
-                .interactiveDismissDisabled(true)
-                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                .presentationBackgroundInteraction(.enabled(upThrough: .large))
+                .presentationBackground(
+                    viewModel.selectedTheme == .liquidGlass
+                        ? AnyShapeStyle(Material.ultraThinMaterial)
+                        : AnyShapeStyle(Material.regularMaterial)
+                )
         }
         .sheet(isPresented: $viewModel.showSettings) {
             SettingsView(viewModel: viewModel)

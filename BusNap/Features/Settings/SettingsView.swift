@@ -1,6 +1,18 @@
 import SwiftUI
 
-let ringtoneOptions = ["Alarm", "Busy Bee", "Chime", "Gentle Wake", "Marimba"]
+struct Ringtone: Identifiable, Hashable {
+    let id = UUID()
+    let name: String
+    let filename: String
+}
+
+let ringtones: [Ringtone] = [
+    Ringtone(name: "Alarm", filename: "alarm"),
+    Ringtone(name: "Busy Bee", filename: "busy_bee"),
+    Ringtone(name: "Chime", filename: "chime"),
+    Ringtone(name: "Gentle Wake", filename: "gentle_wake"),
+    Ringtone(name: "Marimba", filename: "marimba"),
+]
 
 struct SettingsView: View {
     @Bindable var viewModel: MapDashboardViewModel
@@ -14,6 +26,7 @@ struct SettingsView: View {
                 ringtoneSection
                 themeSection
             }
+            .listStyle(.insetGrouped)
             .navigationTitle("Configuración")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -29,21 +42,25 @@ struct SettingsView: View {
 
     private var customTimeSection: some View {
         Section("Tiempo personalizado") {
-            HStack {
-                Text("Minutos de aviso")
-                    .font(.subheadline)
-                Spacer()
-                Picker("Minutos", selection: $viewModel.customLeadTimeMinutes) {
-                    ForEach(1...19, id: \.self) { minute in
-                        Text("\(minute) min").tag(minute)
-                    }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Minutos de aviso")
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(viewModel.customLeadTimeMinutes) min")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(AppConstants.Colors.primaryAccent)
                 }
-                .pickerStyle(.menu)
+
+                Stepper("", value: $viewModel.customLeadTimeMinutes, in: 1...19)
+                    .labelsHidden()
             }
 
             Button(action: {
                 let custom = AlertLeadTime.safeCustom(minutes: viewModel.customLeadTimeMinutes)
                 viewModel.updateLeadTime(custom)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }) {
                 HStack {
                     Spacer()
@@ -142,19 +159,19 @@ struct RingtonePickerView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        List(ringtoneOptions, id: \.self) { tone in
+        List(ringtones) { tone in
             Button(action: {
-                selectedRingtone = tone
+                selectedRingtone = tone.name
                 dismiss()
             }) {
                 HStack {
                     Image(systemName: "speaker.wave.2.fill")
                         .foregroundColor(AppConstants.Colors.primaryAccent)
-                    Text(tone)
+                    Text(tone.name)
                         .font(.subheadline)
                         .foregroundColor(AppConstants.Colors.primaryText)
                     Spacer()
-                    if tone == selectedRingtone {
+                    if tone.name == selectedRingtone {
                         Image(systemName: "checkmark")
                             .foregroundColor(AppConstants.Colors.primaryAccent)
                     }
@@ -162,6 +179,7 @@ struct RingtonePickerView: View {
             }
             .buttonStyle(.plain)
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("Seleccionar tono")
         .navigationBarTitleDisplayMode(.inline)
     }

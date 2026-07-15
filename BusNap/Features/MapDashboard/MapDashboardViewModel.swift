@@ -19,8 +19,8 @@ class MapDashboardViewModel {
     var isPaused: Bool = false
     var showSettings: Bool = false
     var showSheet: Bool = true
-    var showFavorites: Bool = false
-    var selectedDetent: PresentationDetent = .height(200)
+    var selectedDetent: PresentationDetent = .fraction(0.2)
+    var searchText: String = ""
 
     var tripUIState: TripUIState {
         TripUIState.from(engineState: tripEngine.state, isPaused: isPaused)
@@ -35,7 +35,6 @@ class MapDashboardViewModel {
     var errorMessage: String? = nil
     var isOffline: Bool = false
     var destinationName: String = ""
-    var showNameAlert: Bool = false
     var savedFavorites: [Destination] = []
 
     var vibrationEnabled: Bool = true {
@@ -53,12 +52,16 @@ class MapDashboardViewModel {
     }
 
     var currentDetents: Set<PresentationDetent> {
+        [.fraction(0.2), .medium, .large]
+    }
+
+    var defaultDetent: PresentationDetent {
         switch tripUIState {
-        case .initial: return [.height(200)]
-        case .configuring: return [.medium]
-        case .active: return [.height(200)]
-        case .paused: return [.height(200)]
-        case .finished: return [.height(250)]
+        case .initial:     return .fraction(0.2)
+        case .configuring: return .medium
+        case .active:      return .fraction(0.2)
+        case .paused:      return .fraction(0.2)
+        case .finished:    return .fraction(0.35)
         }
     }
 
@@ -113,24 +116,17 @@ class MapDashboardViewModel {
     // MARK: - Sheet Detent Management
 
     func updateDetentForCurrentState() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            switch tripUIState {
-            case .initial:     selectedDetent = .height(200)
-            case .configuring: selectedDetent = .medium
-            case .active:      selectedDetent = .height(200)
-            case .paused:      selectedDetent = .height(200)
-            case .finished:    selectedDetent = .height(250)
-            }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            selectedDetent = defaultDetent
         }
     }
 
     // MARK: - User Intentions
 
     func updateDestination(_ destination: Destination) {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             tripEngine.updateDestination(destination)
             destinationName = destination.name ?? ""
-            showNameAlert = true
             fetchETA(for: destination)
             updateDetentForCurrentState()
         }
@@ -140,17 +136,16 @@ class MapDashboardViewModel {
         let trimmed = destinationName.trimmingCharacters(in: .whitespacesAndNewlines)
         let name = trimmed.isEmpty ? "Punto Seleccionado" : trimmed
         tripEngine.updateDestinationName(name)
-        showNameAlert = false
     }
 
-    func saveAsFavorite() {
+    func toggleFavorite() {
         guard let dest = tripEngine.currentDestination else { return }
-        if !savedFavorites.contains(dest) {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                savedFavorites.append(dest)
-                preferencesStore.saveFavorites(savedFavorites)
-            }
+        if let index = savedFavorites.firstIndex(of: dest) {
+            savedFavorites.remove(at: index)
+        } else {
+            savedFavorites.append(dest)
         }
+        preferencesStore.saveFavorites(savedFavorites)
     }
 
     func loadFavorites() {
@@ -180,7 +175,7 @@ class MapDashboardViewModel {
         }
 
         AudioManager.shared.prepareAudioEngine()
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             tripEngine.startTrip(to: destination, leadTime: leadTime)
             isPaused = false
             errorMessage = nil
@@ -189,13 +184,13 @@ class MapDashboardViewModel {
     }
 
     func pauseTrip() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             isPaused = true
         }
     }
 
     func resumeTrip() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             isPaused = false
             if let destination = selectedDestination {
                 lastETARequestTime = Date()
@@ -205,7 +200,7 @@ class MapDashboardViewModel {
     }
 
     func cancelTrip() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             tripEngine.cancelTrip()
             simulatedETA = nil
             errorMessage = nil
