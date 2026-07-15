@@ -30,14 +30,13 @@ class AudioManager {
     }
     
     func playAlarm() {
+        stopAlarm()
         
         do {
                 try AVAudioSession.sharedInstance().setActive(true)
             } catch {
                 print("Aviso: No se pudo reactivar la sesión de audio.")
             }
-        // Ya no activamos la sesión aquí, porque ya se encendió antes.
-        // Solo nos preocupamos por reproducir el sonido.
         guard let url = Bundle.main.url(forResource: "alarm", withExtension: "mp3") else {
             print(" No se encontró el archivo de sonido.")
             return

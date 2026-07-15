@@ -45,17 +45,18 @@ final class TripEngine {
     
     // MARK: - Intenciones (Ciclo de Vida)
     
-    func startTrip(to destination: Destination) {
+    func startTrip(to destination: Destination, leadTime: AlertLeadTime) {
         self.currentDestination = destination
         
-        Task { @MainActor in
-            self.state = .monitoring
-        }
+        self.state = .monitoring
         
         cancelActiveTask()
         
-        // Delegamos la vigilancia perimetral (Radio default: 1000m)
-        geofenceMonitor.startMonitoring(destination: destination, radius: 1000.0)
+        let leadTimeSeconds = Double(leadTime.minutes * 60)
+        let estimatedSpeed: Double = 5.5
+        let radius = max(500.0, leadTimeSeconds * estimatedSpeed)
+        
+        geofenceMonitor.startMonitoring(destination: destination, radius: radius)
         
         monitoringTask = Task {
             // Aquí vivirá la lógica de red adaptativa

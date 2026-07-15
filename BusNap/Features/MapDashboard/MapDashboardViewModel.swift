@@ -40,6 +40,7 @@ class MapDashboardViewModel {
     // MARK: - Variables de Control de Energía
     @ObservationIgnored private var lastETARequestTime: Date = .distantPast
     @ObservationIgnored private var isAppInBackground: Bool = false
+    @ObservationIgnored private var isFetchingETA: Bool = false
     
     // Inicializador completo con inyección de dependencias
     init(routeEstimator: RouteEstimating? = nil,
@@ -82,7 +83,6 @@ class MapDashboardViewModel {
     }
     
     func activateTrip() {
-        print("🚨 [ALERTA] ¡Alguien llamó a activateTrip!")
         guard let destination = tripEngine.currentDestination else { return }
         
         if permissionState == .notDetermined {
@@ -95,8 +95,13 @@ class MapDashboardViewModel {
             return
         }
         
+        if permissionState == .authorizedWhenInUse {
+            errorMessage = "La alarma requiere permiso 'Siempre' para funcionar en segundo plano. Ve a Configuración > Privacidad > Localización."
+            return
+        }
+        
         AudioManager.shared.prepareAudioEngine()
-        tripEngine.startTrip(to: destination)
+        tripEngine.startTrip(to: destination, leadTime: leadTime)
         errorMessage = nil
     }
     
@@ -117,18 +122,21 @@ class MapDashboardViewModel {
     // MARK: - Lógica Privada
         
         private func fetchETA(for destination: Destination, from currentLocation: CLLocation? = nil) {
+            guard !isFetchingETA else { return }
+            isFetchingETA = true
             if simulatedETA == nil { isLoadingETA = true }
             errorMessage = nil
             
             Task {
                 do {
-                    // Le pasamos la coordenada actual al estimador
                     let estimate = try await routeEstimator.estimateRoute(to: destination, from: currentLocation)
                     self.simulatedETA = estimate.expectedTravelTime
                     self.isLoadingETA = false
+                    self.isFetchingETA = false
                 } catch {
                     self.errorMessage = error.localizedDescription
                     self.isLoadingETA = false
+                    self.isFetchingETA = false
                 }
             }
         }

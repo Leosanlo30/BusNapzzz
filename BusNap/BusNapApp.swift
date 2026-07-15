@@ -21,21 +21,7 @@ struct BusNapApp: App {
                 
                 // 2. Escuchamos activamente cuando el estado cambie (iOS 17+)
                 .onChange(of: scenePhase) { _, newPhase in
-                    switch newPhase {
-                    case .background:
-                        print("[ENERGÍA] App en segundo plano: El usuario bloqueó la pantalla o salió.")
-                        // Si tuvieras animaciones pesadas o cálculos de red cíclicos, aquí los pausas.
-                        
-                    case .active:
-                        print("[ENERGÍA] App activa: El usuario volvió a abrir la app.")
-                        // Aquí retomas los cálculos visuales si los habías pausado.
-                        
-                    case .inactive:
-                        print("[ENERGÍA] App inactiva: (Ej. Bajó el centro de control o recibió una llamada)")
-                        
-                    @unknown default:
-                        break
-                    }
+                    viewModel.handleScenePhase(newPhase)
                 }
         }
     }

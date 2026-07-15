@@ -30,7 +30,11 @@ final class GeofenceMonitor: NSObject, CLLocationManagerDelegate, @unchecked Sen
     func startMonitoring(destination: Destination, radius: CLLocationDistance = 1000.0) {
         let coordinate = CLLocationCoordinate2D(latitude: destination.latitude, longitude: destination.longitude)
         
-        // 1. Validación de seguridad lógica: No registrar coordenadas absurdas
+        guard CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else {
+            print(" GeofenceMonitor: La geocerca no está disponible en este dispositivo.")
+            return
+        }
+        
         guard CLLocationCoordinate2DIsValid(coordinate) else {
             print(" GeofenceMonitor: Intento de monitorear coordenadas inválidas.")
             return

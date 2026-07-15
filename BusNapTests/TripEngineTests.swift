@@ -17,10 +17,8 @@ struct TripEngineTests {
             let engine = TripEngine()
             let destination = Destination(name: "Test", latitude: 0, longitude: 0)
             
-            engine.startTrip(to: destination)
+            engine.startTrip(to: destination, leadTime: .fiveMinutes)
             
-            // Damos un respiro al motor para procesar el start
-            await Task.yield()
             #expect(engine.state == .monitoring)
             
             engine.cancelTrip()
