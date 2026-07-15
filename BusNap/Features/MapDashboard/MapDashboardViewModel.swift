@@ -18,6 +18,7 @@ class MapDashboardViewModel {
     // MARK: - UI State
     var isPaused: Bool = false
     var showSheet: Bool = true
+    var showSettings: Bool = false
     var selectedDetent: PresentationDetent = .fraction(0.25)
     var searchText: String = ""
 

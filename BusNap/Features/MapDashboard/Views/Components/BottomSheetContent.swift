@@ -2,7 +2,6 @@ import SwiftUI
 
 struct BottomSheetContent: View {
     @Bindable var viewModel: MapDashboardViewModel
-    let onOpenSettings: () -> Void
     @FocusState private var isNameFocused: Bool
 
     var body: some View {
@@ -22,6 +21,9 @@ struct BottomSheetContent: View {
         }
         .padding(AppConstants.Layout.standardPadding)
         .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.tripUIState)
+        .fullScreenCover(isPresented: $viewModel.showSettings) {
+            SettingsView(viewModel: viewModel)
+        }
     }
 
     // MARK: - Initial State
@@ -97,7 +99,10 @@ struct BottomSheetContent: View {
     }
 
     private var settingsIcon: some View {
-        Button(action: onOpenSettings) {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            viewModel.showSettings = true
+        }) {
             Image(systemName: "gearshape.fill")
                 .font(.title3)
                 .foregroundColor(AppConstants.Colors.secondaryText)
