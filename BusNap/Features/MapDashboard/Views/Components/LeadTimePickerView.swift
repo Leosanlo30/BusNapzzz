@@ -27,8 +27,7 @@ struct LeadTimePickerView: View {
                     }) {
                         Text(option.displayTitle)
                             .font(.system(size: 14, weight: isSelected ? .bold : .medium))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, minHeight: 50)
                             .background(
                                 isSelected
                                     ? AnyShapeStyle(AppConstants.Colors.primaryAccent)
