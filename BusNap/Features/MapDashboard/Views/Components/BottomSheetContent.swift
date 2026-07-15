@@ -21,8 +21,18 @@ struct BottomSheetContent: View {
         }
         .padding(AppConstants.Layout.standardPadding)
         .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.tripUIState)
+        .presentationBackground(sheetBackground)
         .fullScreenCover(isPresented: $viewModel.showSettings) {
             SettingsView(viewModel: viewModel)
+        }
+    }
+
+    private var sheetBackground: AnyShapeStyle {
+        switch viewModel.selectedTheme {
+        case .liquidGlass:
+            AnyShapeStyle(.ultraThinMaterial)
+        default:
+            AnyShapeStyle(Color(UIColor.systemBackground))
         }
     }
 

@@ -26,16 +26,6 @@ struct MapDashboardView: View {
             .presentationDragIndicator(.visible)
             .interactiveDismissDisabled(true)
             .presentationBackgroundInteraction(.enabled(upThrough: .large))
-            .presentationBackground(sheetBackground)
-        }
-    }
-
-    private var sheetBackground: AnyShapeStyle {
-        switch viewModel.selectedTheme {
-        case .liquidGlass:
-            AnyShapeStyle(.ultraThinMaterial)
-        default:
-            AnyShapeStyle(Color(UIColor.systemBackground))
         }
     }
 

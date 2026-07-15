@@ -50,9 +50,10 @@ struct DestinationMapView: View {
             .safeAreaPadding(.top, 100)
             .overlay(alignment: .topTrailing) {
                 VStack(spacing: 8) {
+                    Color.clear
+                        .frame(height: 170)
                     settingsButton
                 }
-                .padding(.top, 120)
                 .padding(.trailing, 8)
             }
         }

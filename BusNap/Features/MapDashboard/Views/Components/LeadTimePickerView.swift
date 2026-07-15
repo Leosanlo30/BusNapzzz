@@ -27,9 +27,8 @@ struct LeadTimePickerView: View {
                     }) {
                         Text(option.displayTitle)
                             .font(.system(size: 14, weight: isSelected ? .bold : .medium))
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 8)
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
                             .background(
                                 isSelected
                                     ? AnyShapeStyle(AppConstants.Colors.primaryAccent)
@@ -43,6 +42,7 @@ struct LeadTimePickerView: View {
                             )
                     }
                     .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
                     .animation(.easeInOut(duration: 0.2), value: isSelected)
                 }
             }
