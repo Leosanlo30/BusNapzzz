@@ -148,6 +148,17 @@ class MapDashboardViewModel {
         preferencesStore.saveFavorites(savedFavorites)
     }
 
+    func clearDestination() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            tripEngine.cancelTrip()
+            simulatedETA = nil
+            errorMessage = nil
+            destinationName = ""
+            searchText = ""
+            updateDetentForCurrentState()
+        }
+    }
+
     func loadFavorites() {
         savedFavorites = preferencesStore.loadFavorites()
     }
