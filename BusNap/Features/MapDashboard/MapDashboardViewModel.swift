@@ -41,7 +41,9 @@ class MapDashboardViewModel {
     var ringtoneName: String = "Alarm" {
         didSet { UserDefaults.standard.set(ringtoneName, forKey: "ringtoneName") }
     }
-    @ObservationIgnored @AppStorage("customLeadTime") var customLeadTimeMinutes = 10
+    var customLeadTimeMinutes = 10 {
+        didSet { UserDefaults.standard.set(customLeadTimeMinutes, forKey: "customLeadTime") }
+    }
 
     @ObservationIgnored @AppStorage("appTheme") private var appThemeRaw = AppTheme.liquidGlass.rawValue
 

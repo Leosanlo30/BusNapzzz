@@ -9,12 +9,14 @@ import Foundation
 import SwiftUI
 
 enum AppTheme: String, CaseIterable, Codable, Sendable {
+    case system
     case light
     case dark
     case liquidGlass
 
     var displayName: String {
         switch self {
+        case .system: return "System"
         case .light: return "Light"
         case .dark: return "Dark"
         case .liquidGlass: return "Liquid Glass"
@@ -23,6 +25,7 @@ enum AppTheme: String, CaseIterable, Codable, Sendable {
 
     var systemImage: String {
         switch self {
+        case .system: return "gearshape"
         case .light: return "sun.max.fill"
         case .dark: return "moon.fill"
         case .liquidGlass: return "drop.fill"

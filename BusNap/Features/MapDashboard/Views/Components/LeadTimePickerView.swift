@@ -19,7 +19,7 @@ struct LeadTimePickerView: View {
                 .foregroundColor(AppConstants.Colors.secondaryText)
 
             HStack(spacing: 12) {
-                ForEach(options) { option in
+                ForEach(options, id: \.id) { option in
                     let isSelected = viewModel.leadTime.minutes == option.minutes
 
                     Button(action: {
@@ -30,9 +30,17 @@ struct LeadTimePickerView: View {
                             .padding(.vertical, 10)
                             .padding(.horizontal, 8)
                             .frame(maxWidth: .infinity)
-                            .background(isSelected ? AppConstants.Colors.primaryAccent : Color(UIColor.tertiarySystemFill))
+                            .background(
+                                isSelected
+                                    ? AnyShapeStyle(AppConstants.Colors.primaryAccent)
+                                    : AnyShapeStyle(Material.ultraThinMaterial),
+                                in: RoundedRectangle(cornerRadius: 10)
+                            )
                             .foregroundColor(isSelected ? .white : .primary)
-                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.primary.opacity(0.1), lineWidth: isSelected ? 0 : 0.5)
+                            )
                     }
                     .buttonStyle(.plain)
                     .animation(.easeInOut(duration: 0.2), value: isSelected)
@@ -40,11 +48,4 @@ struct LeadTimePickerView: View {
             }
         }
     }
-}
-
-#Preview {
-    @MainActor in
-    let mockVM = MapDashboardViewModel()
-    return LeadTimePickerView(viewModel: mockVM)
-        .padding()
 }

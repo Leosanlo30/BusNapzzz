@@ -117,11 +117,11 @@ struct SettingsView: View {
     // MARK: - Themes
 
     private var themeSection: some View {
-        Section("Tema") {
+        Section("Apariencia") {
             ForEach(AppTheme.allCases, id: \.self) { theme in
                 Button(action: { viewModel.updateTheme(theme) }) {
                     HStack {
-                        Image(systemName: "paintbrush.fill")
+                        Image(systemName: theme.systemImage)
                             .foregroundColor(AppConstants.Colors.primaryAccent)
                             .frame(width: 28)
 
@@ -141,11 +141,13 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
 
-            if viewModel.selectedTheme == .liquidGlass {
+            if viewModel.selectedTheme == .liquidGlass || viewModel.selectedTheme == .system {
                 HStack {
                     Image(systemName: "info.circle")
                         .foregroundColor(AppConstants.Colors.secondaryText)
-                    Text("Los paneles se vuelven translúcidos para mostrar el mapa detrás.")
+                    Text(viewModel.selectedTheme == .liquidGlass
+                         ? "Los paneles se vuelven translúcidos para mostrar el mapa detrás."
+                         : "Sigue la apariencia del sistema.")
                         .font(.caption)
                         .foregroundColor(AppConstants.Colors.secondaryText)
                 }

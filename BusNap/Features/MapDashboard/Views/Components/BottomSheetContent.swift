@@ -36,10 +36,7 @@ struct BottomSheetContent: View {
 
                 if !viewModel.savedFavorites.isEmpty {
                     favoritesSection
-                        .padding(.bottom, 16)
                 }
-
-                settingsIcon
             }
         }
     }
@@ -59,8 +56,12 @@ struct BottomSheetContent: View {
             }
         }
         .padding(12)
-        .background(Color(UIColor.tertiarySystemFill))
+        .background(Material.ultraThinMaterial)
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -79,6 +80,8 @@ struct BottomSheetContent: View {
                                 Circle()
                                     .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
                                     .frame(width: 52, height: 52)
+                                    .background(Material.ultraThinMaterial)
+                                    .clipShape(Circle())
                                 Image(systemName: fav.icon ?? "heart.fill")
                                     .font(.title3)
                                     .foregroundColor(AppConstants.Colors.primaryAccent)
@@ -98,20 +101,6 @@ struct BottomSheetContent: View {
         }
     }
 
-    private var settingsIcon: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            viewModel.showSettings = true
-        }) {
-            Image(systemName: "gearshape.fill")
-                .font(.title3)
-                .foregroundColor(AppConstants.Colors.secondaryText)
-        }
-        .buttonStyle(.hapticLight)
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.vertical, 8)
-    }
-
     // MARK: - Configuring State
 
     private var configuringState: some View {
@@ -119,8 +108,9 @@ struct BottomSheetContent: View {
             VStack(spacing: 16) {
                 HStack(spacing: 8) {
                     cancelPinButton
+                    Spacer()
                     destinationNameField
-                    Spacer(minLength: 4)
+                    Spacer()
                     starMenu
                 }
 
@@ -163,8 +153,12 @@ struct BottomSheetContent: View {
                 .font(.title3)
                 .foregroundColor(.secondary)
                 .frame(width: 36, height: 36)
-                .background(Color(UIColor.tertiarySystemFill))
+                .background(Material.ultraThinMaterial)
                 .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
         }
         .buttonStyle(.hapticLight)
     }
@@ -182,8 +176,41 @@ struct BottomSheetContent: View {
             Button(action: { viewModel.saveFavorite(icon: "briefcase.fill") }) {
                 Label("Trabajo", systemImage: "briefcase.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "mappin.and.ellipse") }) {
-                Label("Pin de mapa", systemImage: "mappin.and.ellipse")
+            Button(action: { viewModel.saveFavorite(icon: "heart.fill") }) {
+                Label("Corazón", systemImage: "heart.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "star.fill") }) {
+                Label("Estrella", systemImage: "star.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "flag.fill") }) {
+                Label("Bandera", systemImage: "flag.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "location.fill") }) {
+                Label("Ubicación", systemImage: "location.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "building.fill") }) {
+                Label("Edificio", systemImage: "building.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "bag.fill") }) {
+                Label("Bolsa", systemImage: "bag.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "cart.fill") }) {
+                Label("Carrito", systemImage: "cart.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "cross.fill") }) {
+                Label("Médico", systemImage: "cross.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "book.fill") }) {
+                Label("Libro", systemImage: "book.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "clock.fill") }) {
+                Label("Reloj", systemImage: "clock.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "sun.max.fill") }) {
+                Label("Sol", systemImage: "sun.max.fill")
+            }
+            Button(action: { viewModel.saveFavorite(icon: "moon.fill") }) {
+                Label("Luna", systemImage: "moon.fill")
             }
         } label: {
             Image(systemName: viewModel.isCurrentDestinationFavorite() ? "star.fill" : "star")
@@ -213,8 +240,12 @@ struct BottomSheetContent: View {
             }
         }
         .padding(12)
-        .background(Color(UIColor.tertiarySystemFill))
+        .background(Material.ultraThinMaterial)
         .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
     }
 
     // MARK: - Active State

@@ -48,7 +48,32 @@ struct DestinationMapView: View {
                 MapPitchToggle()
             }
             .safeAreaPadding(.top, 100)
+            .overlay(alignment: .bottomTrailing) {
+                settingsButton
+                    .padding(.trailing, 8)
+                    .padding(.bottom, 180)
+            }
         }
         .ignoresSafeArea(edges: .all)
+    }
+
+    private var settingsButton: some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            viewModel.showSettings = true
+        }) {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 18))
+                .foregroundColor(AppConstants.Colors.primaryAccent)
+                .frame(width: 40, height: 40)
+                .background(Material.ultraThinMaterial)
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
+        }
+        .buttonStyle(.hapticLight)
     }
 }
