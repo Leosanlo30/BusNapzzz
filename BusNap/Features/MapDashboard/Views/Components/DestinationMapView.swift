@@ -48,10 +48,12 @@ struct DestinationMapView: View {
                 MapPitchToggle()
             }
             .safeAreaPadding(.top, 100)
-            .overlay(alignment: .bottomTrailing) {
-                settingsButton
-                    .padding(.trailing, 8)
-                    .padding(.bottom, 180)
+            .overlay(alignment: .topTrailing) {
+                VStack(spacing: 8) {
+                    settingsButton
+                }
+                .padding(.top, 120)
+                .padding(.trailing, 8)
             }
         }
         .ignoresSafeArea(edges: .all)

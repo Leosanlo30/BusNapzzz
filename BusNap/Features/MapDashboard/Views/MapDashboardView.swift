@@ -33,7 +33,7 @@ struct MapDashboardView: View {
     private var sheetBackground: AnyShapeStyle {
         switch viewModel.selectedTheme {
         case .liquidGlass:
-            AnyShapeStyle(Material.ultraThinMaterial)
+            AnyShapeStyle(.ultraThinMaterial)
         default:
             AnyShapeStyle(Color(UIColor.systemBackground))
         }
