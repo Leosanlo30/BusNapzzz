@@ -44,6 +44,8 @@ struct SettingsView: View {
         Section("Tiempo personalizado") {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
+                    Image(systemName: "timer")
+                        .foregroundColor(AppConstants.Colors.primaryAccent)
                     Text("Minutos de aviso")
                         .font(.subheadline)
                     Spacer()
@@ -97,7 +99,7 @@ struct SettingsView: View {
                 RingtonePickerView(selectedRingtone: $viewModel.ringtoneName)
             } label: {
                 HStack {
-                    Image(systemName: "music.note")
+                    Image(systemName: "bell.fill")
                         .foregroundColor(AppConstants.Colors.primaryAccent)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Tono")
@@ -119,7 +121,7 @@ struct SettingsView: View {
             ForEach(AppTheme.allCases, id: \.self) { theme in
                 Button(action: { viewModel.updateTheme(theme) }) {
                     HStack {
-                        Image(systemName: theme.systemImage)
+                        Image(systemName: "paintbrush.fill")
                             .foregroundColor(AppConstants.Colors.primaryAccent)
                             .frame(width: 28)
 
@@ -165,7 +167,7 @@ struct RingtonePickerView: View {
                 dismiss()
             }) {
                 HStack {
-                    Image(systemName: "speaker.wave.2.fill")
+                    Image(systemName: "bell.fill")
                         .foregroundColor(AppConstants.Colors.primaryAccent)
                     Text(tone.name)
                         .font(.subheadline)

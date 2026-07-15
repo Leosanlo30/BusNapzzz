@@ -29,6 +29,9 @@ struct MapDashboardView: View {
                         : AnyShapeStyle(Material.regularMaterial)
                 )
         }
+        .fullScreenCover(isPresented: $viewModel.showSettings) {
+            SettingsView(viewModel: viewModel)
+        }
     }
 
     private var offlineBanner: some View {

@@ -138,14 +138,27 @@ class MapDashboardViewModel {
         tripEngine.updateDestinationName(name)
     }
 
-    func toggleFavorite() {
+    func saveFavorite(icon: String) {
         guard let dest = tripEngine.currentDestination else { return }
+        var saved = dest
+        saved.icon = icon
         if let index = savedFavorites.firstIndex(of: dest) {
-            savedFavorites.remove(at: index)
+            savedFavorites[index] = saved
         } else {
-            savedFavorites.append(dest)
+            savedFavorites.append(saved)
         }
         preferencesStore.saveFavorites(savedFavorites)
+    }
+
+    func removeFavorite() {
+        guard let dest = tripEngine.currentDestination else { return }
+        savedFavorites.removeAll { $0 == dest }
+        preferencesStore.saveFavorites(savedFavorites)
+    }
+
+    func isCurrentDestinationFavorite() -> Bool {
+        guard let dest = tripEngine.currentDestination else { return false }
+        return savedFavorites.contains(dest)
     }
 
     func clearDestination() {
