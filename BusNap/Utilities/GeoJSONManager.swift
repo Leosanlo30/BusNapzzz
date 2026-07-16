@@ -80,6 +80,54 @@ final class GeoJSONManager {
 
         return stops
     }
+
+    func loadParaderos(from fileName: String, in bundle: Bundle = .main) throws -> [BusStop] {
+        guard let url = bundle.url(forResource: fileName, withExtension: "geojson") else {
+            throw GeoJSONError.fileNotFound(fileName)
+        }
+
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw GeoJSONError.invalidData
+        }
+
+        let decoder = JSONDecoder()
+        let collection: ParaderoCollection
+        do {
+            collection = try decoder.decode(ParaderoCollection.self, from: data)
+        } catch {
+            throw GeoJSONError.decodingFailed(error)
+        }
+
+        let stops = collection.features
+            .filter { $0.geometry.type == "Point" }
+            .compactMap { feature -> BusStop? in
+                guard let coords = feature.geometry.coordinates, coords.count >= 2 else { return nil }
+                let longitude = coords[0]
+                let latitude = coords[1]
+
+                let stopId = feature.properties.ref ?? feature.id ?? "para_\(latitude)_\(longitude)"
+                let name = (feature.properties.name ?? "Parada \(stopId)")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                guard !name.isEmpty else { return nil }
+
+                return BusStop(
+                    id: stopId,
+                    name: name,
+                    coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+                    routeNames: []
+                )
+            }
+
+        if stops.isEmpty {
+            throw GeoJSONError.noFeaturesFound
+        }
+
+        return stops
+    }
 }
 
 // MARK: - Unique Helper
@@ -124,4 +172,32 @@ private struct Relation: Decodable {
     let role: String
     let rel: Int
     let reltags: [String: String]
+}
+
+// MARK: - Paradero GeoJSON Models
+
+private struct ParaderoCollection: Decodable {
+    let type: String
+    let features: [ParaderoFeature]
+}
+
+private struct ParaderoFeature: Decodable {
+    let type: String
+    let geometry: ParaderoGeometry
+    let properties: ParaderoProperties
+    let id: String?
+}
+
+private struct ParaderoGeometry: Decodable {
+    let type: String
+    let coordinates: [Double]?
+}
+
+private struct ParaderoProperties: Decodable {
+    let name: String?
+    let ref: String?
+    let bus: String?
+    let highway: String?
+    let `operator`: String?
+    let public_transport: String?
 }

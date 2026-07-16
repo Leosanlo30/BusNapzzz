@@ -226,7 +226,7 @@ class MapDashboardViewModel {
     func loadBusStops() {
         Task {
             do {
-                let stops = try GeoJSONManager.shared.loadBusStops(from: "RUTAS_Merida")
+                let stops = try GeoJSONManager.shared.loadParaderos(from: "PARADEROS_MERIDA")
                 self.busStops = stops
                 self.busStopsLoadError = nil
             } catch {
