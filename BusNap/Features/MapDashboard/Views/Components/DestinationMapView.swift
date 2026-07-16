@@ -51,6 +51,7 @@ struct DestinationMapView: View {
             .overlay(alignment: .topTrailing) {
                 VStack(spacing: 0) {
                     settingsButton
+                        .padding(.top, 12)
                 }
                 .padding(.top, 112)
                 .padding(.trailing, 8)

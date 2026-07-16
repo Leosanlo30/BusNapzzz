@@ -3,6 +3,7 @@ import SwiftUI
 struct BottomSheetContent: View {
     @Bindable var viewModel: MapDashboardViewModel
     @FocusState private var isNameFocused: Bool
+    @State private var isSaved = false
 
     var body: some View {
         Group {
@@ -155,6 +156,7 @@ struct BottomSheetContent: View {
                 .disabled(viewModel.selectedDestination == nil || viewModel.isLoadingETA)
             }
         }
+        .onAppear { isSaved = viewModel.isCurrentDestinationFavorite() }
     }
 
     private var cancelPinButton: some View {
@@ -175,55 +177,100 @@ struct BottomSheetContent: View {
 
     private var starMenu: some View {
         Menu {
-            if viewModel.isCurrentDestinationFavorite() {
-                Button(role: .destructive, action: { viewModel.removeFavorite() }) {
+            if isSaved {
+                Button(role: .destructive, action: {
+                    viewModel.removeFavorite()
+                    isSaved = false
+                }) {
                     Label("Eliminar favorito", systemImage: "trash")
                 }
             }
-            Button(action: { viewModel.saveFavorite(icon: "house.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "house.fill")
+                isSaved = true
+            }) {
                 Label("Casa", systemImage: "house.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "briefcase.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "briefcase.fill")
+                isSaved = true
+            }) {
                 Label("Trabajo", systemImage: "briefcase.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "heart.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "heart.fill")
+                isSaved = true
+            }) {
                 Label("Corazón", systemImage: "heart.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "star.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "star.fill")
+                isSaved = true
+            }) {
                 Label("Estrella", systemImage: "star.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "flag.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "flag.fill")
+                isSaved = true
+            }) {
                 Label("Bandera", systemImage: "flag.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "location.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "location.fill")
+                isSaved = true
+            }) {
                 Label("Ubicación", systemImage: "location.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "building.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "building.fill")
+                isSaved = true
+            }) {
                 Label("Edificio", systemImage: "building.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "bag.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "bag.fill")
+                isSaved = true
+            }) {
                 Label("Bolsa", systemImage: "bag.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "cart.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "cart.fill")
+                isSaved = true
+            }) {
                 Label("Carrito", systemImage: "cart.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "cross.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "cross.fill")
+                isSaved = true
+            }) {
                 Label("Médico", systemImage: "cross.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "book.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "book.fill")
+                isSaved = true
+            }) {
                 Label("Libro", systemImage: "book.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "clock.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "clock.fill")
+                isSaved = true
+            }) {
                 Label("Reloj", systemImage: "clock.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "sun.max.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "sun.max.fill")
+                isSaved = true
+            }) {
                 Label("Sol", systemImage: "sun.max.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "moon.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "moon.fill")
+                isSaved = true
+            }) {
                 Label("Luna", systemImage: "moon.fill")
             }
         } label: {
-            Image(systemName: viewModel.isCurrentDestinationFavorite() ? "star.fill" : "star")
+            Image(systemName: isSaved ? "star.fill" : "star")
                 .font(.title3)
                 .foregroundColor(AppConstants.Colors.primaryAccent)
                 .frame(width: 36, height: 36)
