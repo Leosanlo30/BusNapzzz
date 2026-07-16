@@ -26,6 +26,7 @@ struct BusStopAnnotation: View {
         }
         .padding(24)
         .contentShape(Rectangle())
+        .drawingGroup()
     }
 }
 
@@ -40,7 +41,7 @@ struct DestinationMapView: View {
             Map(position: $cameraPosition) {
                 UserAnnotation()
 
-                ForEach(viewModel.visibleBusStops) { stop in
+                ForEach(viewModel.visibleBusStops, id: \.id) { stop in
                     Annotation(stop.name, coordinate: stop.coordinate) {
                         BusStopAnnotation(
                             stop: stop,
@@ -115,7 +116,7 @@ struct DestinationMapView: View {
                     }
                 }
             }
-            .onMapCameraChange { context in
+            .onMapCameraChange(frequency: .onEnd) { context in
                 viewModel.updateVisibleRegion(context.region)
             }
         }
