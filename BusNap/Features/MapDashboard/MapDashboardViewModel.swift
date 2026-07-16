@@ -27,11 +27,13 @@ class MapDashboardViewModel {
     var busStopsLoadError: String? = nil
     var selectedRoute: String? = nil
     var showRouteSearchResults: Bool = false
+    var selectedStop: BusStop? = nil
 
     // MARK: - Map Region Tracking
     var mapVisibleRegion: MKCoordinateRegion? = nil
+    var mapCameraDistance: CLLocationDistance = 0
 
-    private let zoomThresholdMeters: CLLocationDistance = 50_000
+    private let zoomThresholdMeters: CLLocationDistance = 1_500
 
     var isZoomedIn: Bool {
         guard let region = mapVisibleRegion else { return false }
@@ -40,6 +42,13 @@ class MapDashboardViewModel {
         let south = CLLocation(latitude: region.center.latitude - region.span.latitudeDelta / 2,
                                longitude: region.center.longitude)
         return north.distance(from: south) < zoomThresholdMeters
+    }
+
+    var stopAnnotationScale: CGFloat {
+        guard mapCameraDistance > 0 else { return 0.35 }
+        let clamped = min(mapCameraDistance, zoomThresholdMeters)
+        let t = clamped / zoomThresholdMeters
+        return CGFloat(0.35 + (1.0 - t) * 0.65)
     }
 
     // MARK: - Route Names
@@ -102,12 +111,20 @@ class MapDashboardViewModel {
             stopNameMatches = []
         }
 
+        let favoriteMatches = savedFavorites.filter { fav in
+            guard let name = fav.name else { return false }
+            return normalized(name).contains(normalizedQuery)
+        }
+
         var suggestions: [SearchSuggestion] = []
         for route in routeMatches.prefix(8) {
             suggestions.append(.route(route))
         }
         for stop in stopNameMatches.prefix(5) {
             suggestions.append(.stop(stop))
+        }
+        for fav in favoriteMatches.prefix(5) {
+            suggestions.append(.favorite(fav))
         }
         return suggestions
     }
@@ -246,6 +263,18 @@ class MapDashboardViewModel {
     func selectStop(_ stop: BusStop) {
         selectedRoute = nil
         searchText = ""
+        selectedStop = stop
+        let dest = Destination(
+            name: stop.name,
+            latitude: stop.coordinate.latitude,
+            longitude: stop.coordinate.longitude
+        )
+        updateDestination(dest)
+    }
+
+    func handleMapStopSelection(_ stop: BusStop?) {
+        selectedStop = stop
+        guard let stop else { return }
         let dest = Destination(
             name: stop.name,
             latitude: stop.coordinate.latitude,
@@ -264,6 +293,11 @@ class MapDashboardViewModel {
 
     func updateVisibleRegion(_ region: MKCoordinateRegion) {
         mapVisibleRegion = region
+        let north = CLLocation(latitude: region.center.latitude + region.span.latitudeDelta / 2,
+                               longitude: region.center.longitude)
+        let south = CLLocation(latitude: region.center.latitude - region.span.latitudeDelta / 2,
+                               longitude: region.center.longitude)
+        mapCameraDistance = north.distance(from: south)
     }
 
     // MARK: - Sheet Detent Management
@@ -472,11 +506,13 @@ extension MapDashboardViewModel {
 enum SearchSuggestion: Identifiable {
     case route(String)
     case stop(BusStop)
+    case favorite(Destination)
 
     var id: String {
         switch self {
         case .route(let name): return "route_\(name)"
         case .stop(let stop): return "stop_\(stop.id)"
+        case .favorite(let dest): return "fav_\(dest.latitude)_\(dest.longitude)"
         }
     }
 }

@@ -66,12 +66,14 @@ struct BottomSheetContent: View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-            TextField("Buscar ruta…", text: $viewModel.searchText)
+            TextField("Buscar parada…", text: $viewModel.searchText)
                 .font(.body)
                 .submitLabel(.search)
                 .onSubmit {
                     if let first = viewModel.filteredRouteNames.first {
                         viewModel.selectRoute(first)
+                    } else if let first = viewModel.searchSuggestions.first(where: { if case .stop = $0 { return true }; return false }) {
+                        if case .stop(let stop) = first { viewModel.selectStop(stop) }
                     }
                 }
             if !viewModel.searchText.isEmpty {
@@ -119,7 +121,7 @@ struct BottomSheetContent: View {
                 case .stop(let stop):
                     Button(action: { viewModel.selectStop(stop) }) {
                         HStack(spacing: 10) {
-                            Image(systemName: "mappin.and.ellipse")
+                            Image(systemName: "bus.fill")
                                 .font(.caption)
                                 .foregroundColor(.orange)
                                 .frame(width: 24)
@@ -137,6 +139,27 @@ struct BottomSheetContent: View {
                             Image(systemName: "location.circle")
                                 .font(.caption)
                                 .foregroundColor(.orange)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                    }
+                    .buttonStyle(.plain)
+
+                case .favorite(let dest):
+                    Button(action: { viewModel.selectFavorite(dest) }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: dest.icon ?? "heart.fill")
+                                .font(.caption)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
+                                .frame(width: 24)
+                            Text(dest.name ?? "Favorito")
+                                .font(.subheadline)
+                                .foregroundColor(AppConstants.Colors.primaryText)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "location.circle")
+                                .font(.caption)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
                         }
                         .padding(.vertical, 8)
                         .padding(.horizontal, 12)
