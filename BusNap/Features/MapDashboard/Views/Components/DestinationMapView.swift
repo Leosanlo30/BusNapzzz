@@ -2,6 +2,26 @@ import SwiftUI
 import MapKit
 
 @MainActor
+struct BusStopAnnotation: View {
+    let stop: BusStop
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(.white)
+                .frame(width: 32, height: 32)
+                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+            Circle()
+                .stroke(Color.blue, lineWidth: 2.5)
+                .frame(width: 32, height: 32)
+            Image(systemName: "bus.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.blue)
+        }
+    }
+}
+
+@MainActor
 struct DestinationMapView: View {
     var viewModel: MapDashboardViewModel
     
@@ -12,9 +32,10 @@ struct DestinationMapView: View {
             Map(position: $cameraPosition) {
                 UserAnnotation()
 
-                ForEach(viewModel.busStops) { stop in
-                    Marker(stop.name, coordinate: stop.coordinate)
-                        .tint(.orange)
+                ForEach(viewModel.filteredBusStops) { stop in
+                    Annotation(stop.name, coordinate: stop.coordinate) {
+                        BusStopAnnotation(stop: stop)
+                    }
                 }
 
                 if let dest = viewModel.selectedDestination {
@@ -60,6 +81,13 @@ struct DestinationMapView: View {
                 }
                 .padding(.top, 112)
                 .padding(.trailing, 8)
+            }
+            .onChange(of: viewModel.selectedRoute) { _, newRoute in
+                if newRoute != nil, let position = viewModel.routeSearchCamera {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        cameraPosition = position
+                    }
+                }
             }
         }
         .ignoresSafeArea(edges: .all)

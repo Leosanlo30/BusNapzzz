@@ -46,26 +46,31 @@ final class GeoJSONManager {
         let stops = featureCollection.features
             .filter { $0.geometry.type == "Point" }
             .compactMap { feature -> BusStop? in
-                guard let coordinates = feature.geometry.coordinates else { return nil }
-                let longitude = coordinates[0]
-                let latitude = coordinates[1]
-
-                let name: String
-                if let directName = feature.properties.name, !directName.isEmpty {
-                    name = directName
-                } else if let firstRelation = feature.properties.relations?.first,
-                          let routeName = firstRelation.reltags["name"] {
-                    name = routeName
-                } else {
-                    name = "Parada \(feature.id ?? "desconocida")"
-                }
+                guard let coords = feature.geometry.coordinates, coords.count >= 2 else { return nil }
+                let longitude = coords[0]
+                let latitude = coords[1]
 
                 let stopId = feature.id ?? "node_\(latitude)_\(longitude)"
+
+                let routeNames: [String] = feature.properties.relations?
+                    .compactMap { rel in rel.reltags["name"] }
+                    .uniqued() ?? []
+
+                let name: String = {
+                    if let directName = feature.properties.name, !directName.isEmpty {
+                        return directName
+                    }
+                    if let firstRoute = routeNames.first {
+                        return firstRoute
+                    }
+                    return "Parada \(stopId)"
+                }()
 
                 return BusStop(
                     id: stopId,
                     name: name,
-                    coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+                    coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
+                    routeNames: routeNames
                 )
             }
 
@@ -74,6 +79,15 @@ final class GeoJSONManager {
         }
 
         return stops
+    }
+}
+
+// MARK: - Unique Helper
+
+private extension Sequence where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }
 

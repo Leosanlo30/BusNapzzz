@@ -45,6 +45,16 @@ struct BottomSheetContent: View {
                 searchBar
                     .padding(.bottom, 20)
 
+                if viewModel.selectedRoute != nil {
+                    routeFilterBar
+                        .padding(.bottom, 16)
+                }
+
+                if !viewModel.filteredRouteNames.isEmpty {
+                    routeSearchResults
+                        .padding(.bottom, 16)
+                }
+
                 if !viewModel.savedFavorites.isEmpty {
                     favoritesSection
                 }
@@ -56,11 +66,16 @@ struct BottomSheetContent: View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-            TextField("Buscar destino…", text: $viewModel.searchText)
+            TextField("Buscar ruta…", text: $viewModel.searchText)
                 .font(.body)
                 .submitLabel(.search)
+                .onSubmit {
+                    if let first = viewModel.filteredRouteNames.first {
+                        viewModel.selectRoute(first)
+                    }
+                }
             if !viewModel.searchText.isEmpty {
-                Button(action: { viewModel.searchText = "" }) {
+                Button(action: { viewModel.clearRouteFilter() }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.secondary)
                 }
@@ -74,6 +89,71 @@ struct BottomSheetContent: View {
                 .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var routeSearchResults: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(viewModel.filteredRouteNames.prefix(8), id: \.self) { route in
+                Button(action: { viewModel.selectRoute(route) }) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "bus.fill")
+                            .font(.caption)
+                            .foregroundColor(AppConstants.Colors.primaryAccent)
+                            .frame(width: 24)
+                        Text(route)
+                            .font(.subheadline)
+                            .foregroundColor(AppConstants.Colors.primaryText)
+                            .lineLimit(1)
+                        Spacer()
+                        Image(systemName: "arrow.up.left.square")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                }
+                .buttonStyle(.plain)
+
+                if route != viewModel.filteredRouteNames.prefix(8).last {
+                    Divider()
+                        .padding(.leading, 44)
+                }
+            }
+        }
+        .background(Material.ultraThinMaterial)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+    }
+
+    private var routeFilterBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                .foregroundColor(AppConstants.Colors.primaryAccent)
+            Text(viewModel.selectedRoute ?? "")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+            Spacer()
+            Text("\(viewModel.filteredBusStops.count) paradas")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Button(action: { viewModel.clearRouteFilter() }) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.secondary)
+                    .font(.title3)
+            }
+            .buttonStyle(.hapticLight)
+        }
+        .padding(12)
+        .background(Material.ultraThinMaterial)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
     }
 
     private var favoritesSection: some View {

@@ -25,6 +25,36 @@ class MapDashboardViewModel {
     // MARK: - Bus Stops
     var busStops: [BusStop] = []
     var busStopsLoadError: String? = nil
+    var selectedRoute: String? = nil
+    var showRouteSearchResults: Bool = false
+
+    var allRouteNames: [String] {
+        let names = busStops.flatMap(\.routeNames)
+        return Array(Set(names)).sorted()
+    }
+
+    var filteredRouteNames: [String] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return [] }
+        return allRouteNames.filter { $0.lowercased().contains(query) }
+    }
+
+    var filteredBusStops: [BusStop] {
+        guard let route = selectedRoute else { return busStops }
+        return busStops.filter { $0.routeNames.contains(route) }
+    }
+
+    var routeSearchCamera: MapCameraPosition? {
+        let stops = filteredBusStops
+        guard !stops.isEmpty else { return nil }
+        let coordinates = stops.map(\.coordinate)
+        let rect = coordinates.reduce(into: MKMapRect.null) { rect, coord in
+            let point = MKMapPoint(coord)
+            rect = rect.union(MKMapRect(origin: point, size: MKMapSize(width: 0, height: 0)))
+        }
+        let padded = rect.insetBy(dx: -rect.size.width * 0.3, dy: -rect.size.height * 0.3)
+        return .rect(padded)
+    }
 
     var tripUIState: TripUIState {
         TripUIState.from(engineState: tripEngine.state, isPaused: isPaused)
@@ -135,6 +165,20 @@ class MapDashboardViewModel {
                 self.busStopsLoadError = error.localizedDescription
             }
         }
+    }
+
+    // MARK: - Route Search
+
+    func selectRoute(_ routeName: String) {
+        selectedRoute = routeName
+        searchText = routeName
+        showRouteSearchResults = false
+    }
+
+    func clearRouteFilter() {
+        selectedRoute = nil
+        searchText = ""
+        showRouteSearchResults = false
     }
 
     // MARK: - Sheet Detent Management
