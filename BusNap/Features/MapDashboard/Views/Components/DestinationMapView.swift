@@ -18,6 +18,8 @@ struct BusStopAnnotation: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.blue)
         }
+        .padding(20)
+        .contentShape(Rectangle())
     }
 }
 
@@ -32,7 +34,7 @@ struct DestinationMapView: View {
             Map(position: $cameraPosition) {
                 UserAnnotation()
 
-                ForEach(viewModel.filteredBusStops) { stop in
+                ForEach(viewModel.visibleBusStops) { stop in
                     Annotation(stop.name, coordinate: stop.coordinate) {
                         BusStopAnnotation(stop: stop)
                     }
@@ -88,6 +90,9 @@ struct DestinationMapView: View {
                         cameraPosition = position
                     }
                 }
+            }
+            .onMapCameraChange { context in
+                viewModel.updateVisibleRegion(context.region)
             }
         }
         .ignoresSafeArea(edges: .all)

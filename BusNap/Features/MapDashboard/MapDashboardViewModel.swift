@@ -28,20 +28,88 @@ class MapDashboardViewModel {
     var selectedRoute: String? = nil
     var showRouteSearchResults: Bool = false
 
+    // MARK: - Map Region Tracking
+    var mapVisibleRegion: MKCoordinateRegion? = nil
+
+    private let zoomThresholdMeters: CLLocationDistance = 50_000
+
+    var isZoomedIn: Bool {
+        guard let region = mapVisibleRegion else { return false }
+        let north = CLLocation(latitude: region.center.latitude + region.span.latitudeDelta / 2,
+                               longitude: region.center.longitude)
+        let south = CLLocation(latitude: region.center.latitude - region.span.latitudeDelta / 2,
+                               longitude: region.center.longitude)
+        return north.distance(from: south) < zoomThresholdMeters
+    }
+
+    // MARK: - Route Names
+
     var allRouteNames: [String] {
         let names = busStops.flatMap(\.routeNames)
         return Array(Set(names)).sorted()
     }
 
+    // MARK: - Search Logic (diacritic + case insensitive)
+
+    private func normalized(_ string: String) -> String {
+        string.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+
     var filteredRouteNames: [String] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return [] }
-        return allRouteNames.filter { $0.lowercased().contains(query) }
+        let normalizedQuery = normalized(query)
+        return allRouteNames.filter { normalized($0).contains(normalizedQuery) }
     }
 
     var filteredBusStops: [BusStop] {
-        guard let route = selectedRoute else { return busStops }
-        return busStops.filter { $0.routeNames.contains(route) }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedQuery = normalized(query)
+        var stops = busStops
+
+        if !normalizedQuery.isEmpty {
+            stops = stops.filter { stop in
+                normalized(stop.name).contains(normalizedQuery)
+                || stop.routeNames.contains { normalized($0).contains(normalizedQuery) }
+            }
+        }
+
+        if let route = selectedRoute {
+            stops = stops.filter { $0.routeNames.contains(route) }
+        }
+
+        return stops
+    }
+
+    var visibleBusStops: [BusStop] {
+        guard !isZoomedIn, selectedRoute == nil, searchText.isEmpty else {
+            return filteredBusStops
+        }
+        return []
+    }
+
+    var searchSuggestions: [SearchSuggestion] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return [] }
+        let normalizedQuery = normalized(query)
+
+        let routeMatches = allRouteNames.filter { normalized($0).contains(normalizedQuery) }
+
+        let stopNameMatches: [BusStop]
+        if !query.isEmpty {
+            stopNameMatches = busStops.filter { normalized($0.name).contains(normalizedQuery) }
+        } else {
+            stopNameMatches = []
+        }
+
+        var suggestions: [SearchSuggestion] = []
+        for route in routeMatches.prefix(8) {
+            suggestions.append(.route(route))
+        }
+        for stop in stopNameMatches.prefix(5) {
+            suggestions.append(.stop(stop))
+        }
+        return suggestions
     }
 
     var routeSearchCamera: MapCameraPosition? {
@@ -175,10 +243,27 @@ class MapDashboardViewModel {
         showRouteSearchResults = false
     }
 
+    func selectStop(_ stop: BusStop) {
+        selectedRoute = nil
+        searchText = ""
+        let dest = Destination(
+            name: stop.name,
+            latitude: stop.coordinate.latitude,
+            longitude: stop.coordinate.longitude
+        )
+        updateDestination(dest)
+    }
+
     func clearRouteFilter() {
         selectedRoute = nil
         searchText = ""
         showRouteSearchResults = false
+    }
+
+    // MARK: - Map Region
+
+    func updateVisibleRegion(_ region: MKCoordinateRegion) {
+        mapVisibleRegion = region
     }
 
     // MARK: - Sheet Detent Management
@@ -381,5 +466,17 @@ class MapDashboardViewModel {
 extension MapDashboardViewModel {
     var permissionState: LocationPermissionState {
         locationManager.permissionState
+    }
+}
+
+enum SearchSuggestion: Identifiable {
+    case route(String)
+    case stop(BusStop)
+
+    var id: String {
+        switch self {
+        case .route(let name): return "route_\(name)"
+        case .stop(let stop): return "stop_\(stop.id)"
+        }
     }
 }

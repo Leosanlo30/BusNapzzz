@@ -50,8 +50,8 @@ struct BottomSheetContent: View {
                         .padding(.bottom, 16)
                 }
 
-                if !viewModel.filteredRouteNames.isEmpty {
-                    routeSearchResults
+                if !viewModel.searchSuggestions.isEmpty {
+                    searchSuggestionsList
                         .padding(.bottom, 16)
                 }
 
@@ -91,30 +91,60 @@ struct BottomSheetContent: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var routeSearchResults: some View {
+    private var searchSuggestionsList: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(viewModel.filteredRouteNames.prefix(8), id: \.self) { route in
-                Button(action: { viewModel.selectRoute(route) }) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "bus.fill")
-                            .font(.caption)
-                            .foregroundColor(AppConstants.Colors.primaryAccent)
-                            .frame(width: 24)
-                        Text(route)
-                            .font(.subheadline)
-                            .foregroundColor(AppConstants.Colors.primaryText)
-                            .lineLimit(1)
-                        Spacer()
-                        Image(systemName: "arrow.up.left.square")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+            ForEach(viewModel.searchSuggestions) { suggestion in
+                switch suggestion {
+                case .route(let name):
+                    Button(action: { viewModel.selectRoute(name) }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "bus.fill")
+                                .font(.caption)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
+                                .frame(width: 24)
+                            Text(name)
+                                .font(.subheadline)
+                                .foregroundColor(AppConstants.Colors.primaryText)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "arrow.up.left.square")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
                     }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                }
-                .buttonStyle(.plain)
+                    .buttonStyle(.plain)
 
-                if route != viewModel.filteredRouteNames.prefix(8).last {
+                case .stop(let stop):
+                    Button(action: { viewModel.selectStop(stop) }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(stop.name)
+                                    .font(.subheadline)
+                                    .foregroundColor(AppConstants.Colors.primaryText)
+                                    .lineLimit(1)
+                                Text(stop.routeNames.prefix(3).joined(separator: ", "))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "location.circle")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if suggestion.id != viewModel.searchSuggestions.last?.id {
                     Divider()
                         .padding(.leading, 44)
                 }
