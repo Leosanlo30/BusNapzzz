@@ -12,21 +12,21 @@ struct BusStopAnnotation: View {
     private var strokeWidth: CGFloat { max(1.5, 2.5 * scale) }
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(.white)
-                .frame(width: baseSize, height: baseSize)
-                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-            Circle()
-                .stroke(isSelected ? Color.orange : Color.blue, lineWidth: strokeWidth)
-                .frame(width: baseSize, height: baseSize)
-            Image(systemName: "bus.fill")
-                .font(.system(size: iconSize, weight: .semibold))
-                .foregroundColor(isSelected ? .orange : .blue)
-        }
-        .padding(24)
-        .contentShape(Rectangle())
-        .drawingGroup()
+        let bg = Circle()
+            .fill(.white)
+            .frame(width: baseSize, height: baseSize)
+            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+        let ring = Circle()
+            .stroke(isSelected ? Color.orange : Color.blue, lineWidth: strokeWidth)
+            .frame(width: baseSize, height: baseSize)
+        let icon = Image(systemName: "bus.fill")
+            .font(.system(size: iconSize, weight: .semibold))
+            .foregroundColor(isSelected ? .orange : .blue)
+
+        return ZStack(content: { bg; ring; icon })
+            .padding(24)
+            .contentShape(Rectangle())
+            .drawingGroup()
     }
 }
 
@@ -36,17 +36,27 @@ struct DestinationMapView: View {
 
     @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
 
+    private var selectedStop: BusStop? {
+        guard let sel = viewModel.selectedStop else { return nil }
+        return viewModel.stopsInSight.first(where: { $0.id == sel.id })
+    }
+
     var body: some View {
         MapReader { proxy in
             Map(position: $cameraPosition) {
                 UserAnnotation()
 
-                ForEach(viewModel.visibleBusStops, id: \.id) { stop in
-                    Annotation(stop.name, coordinate: stop.coordinate) {
+                ForEach(viewModel.stopsInSight, id: \.id) { stop in
+                    Marker("", coordinate: stop.coordinate)
+                        .tint(.blue)
+                }
+
+                if let sel = selectedStop {
+                    Annotation(sel.name, coordinate: sel.coordinate) {
                         BusStopAnnotation(
-                            stop: stop,
+                            stop: sel,
                             scale: viewModel.stopAnnotationScale,
-                            isSelected: viewModel.selectedStop?.id == stop.id
+                            isSelected: true
                         )
                     }
                     .annotationTitles(.hidden)
@@ -73,27 +83,26 @@ struct DestinationMapView: View {
             }
             .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
             .onTapGesture { position in
-                if let coordinate = proxy.convert(position, from: .local) {
-                    let tapLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                    let nearest = viewModel.visibleBusStops.min { lhs, rhs in
-                        let l = CLLocation(latitude: lhs.coordinate.latitude, longitude: lhs.coordinate.longitude)
-                        let r = CLLocation(latitude: rhs.coordinate.latitude, longitude: rhs.coordinate.longitude)
-                        return tapLocation.distance(from: l) < tapLocation.distance(from: r)
-                    }
-                    if let nearest {
-                        let loc = CLLocation(latitude: nearest.coordinate.latitude, longitude: nearest.coordinate.longitude)
-                        if tapLocation.distance(from: loc) < 50 {
-                            viewModel.handleMapStopSelection(nearest)
-                            return
-                        }
-                    }
-                    let newDestination = Destination(
-                        name: "Punto Seleccionado",
-                        latitude: coordinate.latitude,
-                        longitude: coordinate.longitude
-                    )
-                    viewModel.updateDestination(newDestination)
+                guard let coordinate = proxy.convert(position, from: .local) else { return }
+                let tapLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                let nearest = viewModel.stopsInSight.min { lhs, rhs in
+                    let l = CLLocation(latitude: lhs.coordinate.latitude, longitude: lhs.coordinate.longitude)
+                    let r = CLLocation(latitude: rhs.coordinate.latitude, longitude: rhs.coordinate.longitude)
+                    return tapLocation.distance(from: l) < tapLocation.distance(from: r)
                 }
+                if let nearest {
+                    let loc = CLLocation(latitude: nearest.coordinate.latitude, longitude: nearest.coordinate.longitude)
+                    if tapLocation.distance(from: loc) < 50 {
+                        viewModel.handleMapStopSelection(nearest)
+                        return
+                    }
+                }
+                let newDestination = Destination(
+                    name: "Punto Seleccionado",
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+                viewModel.updateDestination(newDestination)
             }
             .mapControls {
                 MapUserLocationButton()

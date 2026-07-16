@@ -101,6 +101,24 @@ class MapDashboardViewModel {
         return []
     }
 
+    var stopsInSight: [BusStop] {
+        let candidates = visibleBusStops
+        guard let region = mapVisibleRegion, candidates.count > 50 else {
+            return candidates
+        }
+        let minLat = region.center.latitude - region.span.latitudeDelta / 2
+        let maxLat = region.center.latitude + region.span.latitudeDelta / 2
+        let minLng = region.center.longitude - region.span.longitudeDelta / 2
+        let maxLng = region.center.longitude + region.span.longitudeDelta / 2
+
+        return candidates.filter { stop in
+            stop.coordinate.latitude >= minLat
+            && stop.coordinate.latitude <= maxLat
+            && stop.coordinate.longitude >= minLng
+            && stop.coordinate.longitude <= maxLng
+        }
+    }
+
     var searchSuggestions: [SearchSuggestion] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return [] }
