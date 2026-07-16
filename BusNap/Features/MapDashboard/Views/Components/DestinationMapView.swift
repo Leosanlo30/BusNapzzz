@@ -31,15 +31,36 @@ struct BusStopAnnotation: View {
 }
 
 @MainActor
+struct StopCallout: View {
+    let name: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "bus.fill")
+                .font(.caption)
+                .foregroundColor(AppConstants.Colors.primaryAccent)
+            Text(name)
+                .font(.footnote)
+                .fontWeight(.semibold)
+                .foregroundColor(AppConstants.Colors.primaryText)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Material.ultraThinMaterial)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+    }
+}
+
+@MainActor
 struct DestinationMapView: View {
     @Bindable var viewModel: MapDashboardViewModel
 
     @State private var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
-
-    private var selectedStop: BusStop? {
-        guard let sel = viewModel.selectedStop else { return nil }
-        return viewModel.stopsInSight.first(where: { $0.id == sel.id })
-    }
 
     var body: some View {
         MapReader { proxy in
@@ -47,17 +68,18 @@ struct DestinationMapView: View {
                 UserAnnotation()
 
                 ForEach(viewModel.stopsInSight, id: \.id) { stop in
-                    Marker("", coordinate: stop.coordinate)
-                        .tint(.blue)
-                }
-
-                if let sel = selectedStop {
-                    Annotation(sel.name, coordinate: sel.coordinate) {
-                        BusStopAnnotation(
-                            stop: sel,
-                            scale: viewModel.stopAnnotationScale,
-                            isSelected: true
-                        )
+                    let isSel = viewModel.selectedStop?.id == stop.id
+                    Annotation(stop.name, coordinate: stop.coordinate) {
+                        VStack(spacing: 2) {
+                            BusStopAnnotation(
+                                stop: stop,
+                                scale: viewModel.stopAnnotationScale,
+                                isSelected: isSel
+                            )
+                            if isSel {
+                                StopCallout(name: stop.name)
+                            }
+                        }
                     }
                     .annotationTitles(.hidden)
                 }
