@@ -12,6 +12,11 @@ struct DestinationMapView: View {
             Map(position: $cameraPosition) {
                 UserAnnotation()
 
+                ForEach(viewModel.busStops) { stop in
+                    Marker(stop.name, coordinate: stop.coordinate)
+                        .tint(.orange)
+                }
+
                 if let dest = viewModel.selectedDestination {
                     let leadTimeSeconds = Double(viewModel.leadTime.minutes * 60)
                     let estimatedSpeedPointsPerSecond: Double = 5.5

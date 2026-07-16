@@ -22,6 +22,10 @@ class MapDashboardViewModel {
     var selectedDetent: PresentationDetent = .fraction(0.25)
     var searchText: String = ""
 
+    // MARK: - Bus Stops
+    var busStops: [BusStop] = []
+    var busStopsLoadError: String? = nil
+
     var tripUIState: TripUIState {
         TripUIState.from(engineState: tripEngine.state, isPaused: isPaused)
     }
@@ -113,6 +117,22 @@ class MapDashboardViewModel {
             guard let self = self else { return }
             Task { @MainActor in
                 self.processLocationUpdate(newLocation)
+            }
+        }
+
+        loadBusStops()
+    }
+
+    // MARK: - Bus Stop Loading
+
+    func loadBusStops() {
+        Task {
+            do {
+                let stops = try GeoJSONManager.shared.loadBusStops(from: "RUTAS_Merida")
+                self.busStops = stops
+                self.busStopsLoadError = nil
+            } catch {
+                self.busStopsLoadError = error.localizedDescription
             }
         }
     }
