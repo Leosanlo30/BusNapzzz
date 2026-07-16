@@ -94,7 +94,11 @@ final class TripEngine {
     }
     
     // MARK: - Manejadores de Eventos
-    
+
+    func triggerArrival(for destinationName: String) {
+        handleCriticalZoneEntry(for: destinationName)
+    }
+
     private func handleCriticalZoneEntry(for identifier: String) {
         Task { @MainActor in
             

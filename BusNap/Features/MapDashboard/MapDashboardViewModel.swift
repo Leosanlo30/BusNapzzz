@@ -29,6 +29,10 @@ class MapDashboardViewModel {
     var showRouteSearchResults: Bool = false
     var selectedStop: BusStop? = nil
 
+    // MARK: - Adaptive Proximity
+    var isApproachingStop: Bool = false
+    var distanceToStop: CLLocationDistance? = nil
+
     // MARK: - Map Region Tracking
     var mapVisibleRegion: MKCoordinateRegion? = nil
     var mapCameraDistance: CLLocationDistance = 0
@@ -208,7 +212,7 @@ class MapDashboardViewModel {
         self.routeEstimator = routeEstimator ?? MapKitRouteEstimator()
         self.preferencesStore = preferencesStore ?? UserDefaultsPreferencesStore()
         self.networkMonitor = networkMonitor ?? NetworkMonitor()
-        self.locationManager = locationManager ?? LocationManager()
+        self.locationManager = locationManager ?? AdaptiveLocationManager()
         self.tripEngine = tripEngine ?? TripEngine()
 
         self.leadTime = self.preferencesStore.loadLeadTime()
@@ -317,6 +321,8 @@ class MapDashboardViewModel {
             fetchETA(for: destination)
             updateDetentForCurrentState()
         }
+        let coord = CLLocationCoordinate2D(latitude: destination.latitude, longitude: destination.longitude)
+        locationManager.setDestination(coord)
     }
 
     func confirmDestinationName() {
@@ -357,6 +363,9 @@ class MapDashboardViewModel {
             searchText = ""
             updateDetentForCurrentState()
         }
+        locationManager.clearDestination()
+        isApproachingStop = false
+        distanceToStop = nil
     }
 
     func loadFavorites() {
@@ -419,6 +428,9 @@ class MapDashboardViewModel {
             lastETARequestTime = .distantPast
             updateDetentForCurrentState()
         }
+        locationManager.clearDestination()
+        isApproachingStop = false
+        distanceToStop = nil
     }
 
     func dismissFinished() {
@@ -459,6 +471,14 @@ class MapDashboardViewModel {
     }
 
     private func processLocationUpdate(_ location: CLLocation) {
+        let dest = locationManager.distanceToDestination
+        distanceToStop = dest
+        isApproachingStop = if let d = dest { d < 500 } else { false }
+
+        if let d = dest, d < 100, tripEngine.state == .monitoring || tripEngine.state == .criticalZone {
+            tripEngine.triggerArrival(for: selectedDestination?.name ?? "stop")
+        }
+
         guard tripEngine.state == .monitoring || tripEngine.state == .criticalZone,
               let destination = selectedDestination,
               !isPaused else { return }

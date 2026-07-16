@@ -78,6 +78,14 @@ final class LocationManager: NSObject, LocationManaging {
         clManager.startUpdatingLocation() // Despierta el GPS y que mande ubicacion para el ETA
         print("Modo Normal: GPS restaurado para el mapa.")
     }
+
+    // MARK: - Adaptive Targeting (stub — full implementation in AdaptiveLocationManager)
+
+    func setDestination(_ coordinate: CLLocationCoordinate2D) {}
+
+    func clearDestination() {}
+
+    var distanceToDestination: CLLocationDistance? { nil }
     
     // MARK: - Lógica Privada de Mapeo
     // lenguaje de Apple a nuestro dominio limpio
