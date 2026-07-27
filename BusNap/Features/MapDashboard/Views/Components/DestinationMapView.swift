@@ -132,12 +132,13 @@ struct DestinationMapView: View {
                 MapPitchToggle()
             }
             .safeAreaPadding(.top, 100)
+            // AQUI: Código de la posición del botón de configuración.
             .overlay(alignment: .topTrailing) {
                 VStack(spacing: 0) {
                     settingsButton
                         .padding(.top, 12)
                 }
-                .padding(.top, 112)
+                .padding(.top, 160)
                 .padding(.trailing, 8)
             }
             .onChange(of: viewModel.selectedRoute) { _, newRoute in

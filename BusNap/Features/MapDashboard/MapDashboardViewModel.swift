@@ -118,7 +118,7 @@ final class MapDashboardViewModel {
     @ObservationIgnored @AppStorage("vibrationEnabled") var vibrationEnabled = true
 
     /// The name of the ringtone to play for the alarm.
-    var ringtoneName: String = "Alarm" {
+    var ringtoneName: String = "alarm" {
         didSet { UserDefaults.standard.set(ringtoneName, forKey: "ringtoneName") }
     }
 
@@ -341,7 +341,7 @@ final class MapDashboardViewModel {
         self.tripEngine = tripEngine ?? TripEngine()
 
         self.leadTime = self.preferencesStore.loadLeadTime()
-        self.ringtoneName = UserDefaults.standard.string(forKey: "ringtoneName") ?? "Alarm"
+        self.ringtoneName = UserDefaults.standard.string(forKey: "ringtoneName") ?? "alarm"
         let storedTheme = self.preferencesStore.loadTheme()
         if storedTheme.rawValue != self.appThemeRaw {
             self.appThemeRaw = storedTheme.rawValue
@@ -702,7 +702,7 @@ final class MapDashboardViewModel {
         isApproachingStop = if let d = dest { d < 500 } else { false }
 
         if let d = dest, d < 100, tripEngine.state == .monitoring || tripEngine.state == .criticalZone {
-            tripEngine.triggerArrival(for: selectedDestination?.name ?? "stop")
+            tripEngine.triggerArrival(for: selectedDestination?.name ?? "stop", soundName: ringtoneName)
         }
 
         guard tripEngine.state == .monitoring || tripEngine.state == .criticalZone,

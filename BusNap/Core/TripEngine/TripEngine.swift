@@ -95,15 +95,15 @@ final class TripEngine {
     
     // MARK: - Manejadores de Eventos
 
-    func triggerArrival(for destinationName: String) {
-        handleCriticalZoneEntry(for: destinationName)
+    func triggerArrival(for destinationName: String, soundName: String = "alarm") {
+        handleCriticalZoneEntry(for: destinationName, soundName: soundName)
     }
 
-    private func handleCriticalZoneEntry(for identifier: String) {
+    private func handleCriticalZoneEntry(for identifier: String, soundName: String = "alarm") {
         Task { @MainActor in
             
             self.state = .criticalZone
-            AudioManager.shared.playAlarm() // Alarma encendida
+            AudioManager.shared.playAlarm(soundName: soundName)
             
             let destName = self.currentDestination?.name ?? "tu parada"
             let title = "¡Despierta!"
@@ -111,7 +111,7 @@ final class TripEngine {
             
             
             do {
-                try await notificationManager.scheduleWakeUpAlarm(title: title, body: body)
+                try await notificationManager.scheduleWakeUpAlarm(title: title, body: body, soundName: soundName)
                 self.state = .alarmTriggered
             } catch {
                 print(" TripEngine: Falló el disparo de la alarma - \(error.localizedDescription)")

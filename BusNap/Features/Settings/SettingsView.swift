@@ -8,10 +8,8 @@ struct Ringtone: Identifiable, Hashable {
 
 let ringtones: [Ringtone] = [
     Ringtone(name: "Alarm", filename: "alarm"),
-    Ringtone(name: "Busy Bee", filename: "busy_bee"),
-    Ringtone(name: "Chime", filename: "chime"),
-    Ringtone(name: "Gentle Wake", filename: "gentle_wake"),
-    Ringtone(name: "Marimba", filename: "marimba"),
+    Ringtone(name: "Alarm 2", filename: "alarm2"),
+    Ringtone(name: "Alarm 3", filename: "alarm3"),
 ]
 
 struct SettingsView: View {
@@ -104,7 +102,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Tono")
                             .font(.subheadline)
-                        Text(viewModel.ringtoneName)
+                        Text(ringtones.first(where: { $0.filename == viewModel.ringtoneName })?.name ?? viewModel.ringtoneName)
                             .font(.caption)
                             .foregroundColor(AppConstants.Colors.secondaryText)
                     }
@@ -165,7 +163,7 @@ struct RingtonePickerView: View {
     var body: some View {
         List(ringtones) { tone in
             Button(action: {
-                selectedRingtone = tone.name
+                selectedRingtone = tone.filename
                 dismiss()
             }) {
                 HStack {
@@ -175,7 +173,7 @@ struct RingtonePickerView: View {
                         .font(.subheadline)
                         .foregroundColor(AppConstants.Colors.primaryText)
                     Spacer()
-                    if tone.name == selectedRingtone {
+                    if tone.filename == selectedRingtone {
                         Image(systemName: "checkmark")
                             .foregroundColor(AppConstants.Colors.primaryAccent)
                     }

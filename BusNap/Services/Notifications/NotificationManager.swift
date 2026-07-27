@@ -33,7 +33,7 @@ final class NotificationManager: NotificationScheduling, @unchecked Sendable {
     }
     
     /// Dispara la alarma con prioridad máxima y sonido personalizado.
-    func scheduleWakeUpAlarm(title: String, body: String) async throws {
+    func scheduleWakeUpAlarm(title: String, body: String, soundName: String = "alarm") async throws {
         // 1. Limpieza preventiva: Evitamos notificaciones duplicadas en cola
         cancelPendingAlarms()
         
@@ -49,7 +49,7 @@ final class NotificationManager: NotificationScheduling, @unchecked Sendable {
         
         // 4. Configuración del Audio Personalizado
         // iOS buscará este archivo exactamente con este nombre dentro del bundle principal.
-        content.sound = UNNotificationSound(named: UNNotificationSoundName("alarm.mp3"))
+        content.sound = UNNotificationSound(named: UNNotificationSoundName("\(soundName).mp3"))
         
         // 5. Trigger (Disparador)
         // Como el Geofence ya hizo el cálculo de tiempo/espacio, disparamos la alerta

@@ -17,8 +17,16 @@ protocol NotificationScheduling: Sendable {
     /// - Parameters:
     ///   - title: Título principal de la alerta.
     ///   - body: Cuerpo del mensaje con detalles del destino.
-    func scheduleWakeUpAlarm(title: String, body: String) async throws
+    ///   - soundName: Nombre del archivo de sonido (sin extensión).
+    func scheduleWakeUpAlarm(title: String, body: String, soundName: String) async throws
     
     /// Aborta y limpia cualquier alarma que esté en cola para sonar.
     func cancelPendingAlarms()
+}
+
+extension NotificationScheduling {
+    /// Programar una alarma usando el tono por defecto ("alarm").
+    func scheduleWakeUpAlarm(title: String, body: String) async throws {
+        try await scheduleWakeUpAlarm(title: title, body: body, soundName: "alarm")
+    }
 }
