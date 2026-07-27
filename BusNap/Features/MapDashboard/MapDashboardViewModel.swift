@@ -470,11 +470,20 @@ final class MapDashboardViewModel {
         locationManager.setDestination(coord)
     }
 
-    /// Persists the user‑edited destination name back to the trip engine.
+    /// Persiste el nombre editado y actualiza el favorito si ya existe (upsert).
     func confirmDestinationName() {
         let trimmed = destinationName.trimmingCharacters(in: .whitespacesAndNewlines)
         let name = trimmed.isEmpty ? "Punto Seleccionado" : trimmed
         tripEngine.updateDestinationName(name)
+
+        // Si el destino ya está en favoritos, actualizamos el nombre también
+        guard let dest = tripEngine.currentDestination else { return }
+        if let index = savedFavorites.firstIndex(where: { $0.latitude == dest.latitude && $0.longitude == dest.longitude }) {
+            var updated = savedFavorites[index]
+            updated.name = name
+            savedFavorites[index] = updated
+            preferencesStore.saveFavorites(savedFavorites)
+        }
     }
 
     /// Clears the current destination and resets all related state.
@@ -501,14 +510,15 @@ final class MapDashboardViewModel {
 
     // MARK: - Public: Favorites
 
-    /// Saves the current destination as a favorite with the given icon.
+    /// Guarda el destino actual como favorito con el ícono dado (upsert por coordenadas).
     ///
-    /// - Parameter icon: An SF Symbol name representing the favorite (e.g. `"house.fill"`).
+    /// - Parameter icon: Nombre de SF Symbol para representar el favorito (ej. `"house.fill"`).
     func saveFavorite(icon: String) {
         guard let dest = tripEngine.currentDestination else { return }
         var saved = dest
         saved.icon = icon
-        if let index = savedFavorites.firstIndex(of: dest) {
+        // Buscamos por coordenadas para evitar duplicados aunque el nombre haya cambiado
+        if let index = savedFavorites.firstIndex(where: { $0.latitude == dest.latitude && $0.longitude == dest.longitude }) {
             savedFavorites[index] = saved
         } else {
             savedFavorites.append(saved)
@@ -516,19 +526,19 @@ final class MapDashboardViewModel {
         preferencesStore.saveFavorites(savedFavorites)
     }
 
-    /// Removes the current destination from the favorites list.
+    /// Elimina el destino actual de la lista de favoritos (búsqueda por coordenadas).
     func removeFavorite() {
         guard let dest = tripEngine.currentDestination else { return }
-        savedFavorites.removeAll { $0 == dest }
+        savedFavorites.removeAll { $0.latitude == dest.latitude && $0.longitude == dest.longitude }
         preferencesStore.saveFavorites(savedFavorites)
     }
 
-    /// Returns whether the current destination is already in the favorites list.
+    /// Indica si el destino actual ya está en favoritos (comparación por coordenadas).
     ///
-    /// - Returns: `true` if the destination is a saved favorite.
+    /// - Returns: `true` si el destino ya está guardado como favorito.
     func isCurrentDestinationFavorite() -> Bool {
         guard let dest = tripEngine.currentDestination else { return false }
-        return savedFavorites.contains(dest)
+        return savedFavorites.contains { $0.latitude == dest.latitude && $0.longitude == dest.longitude }
     }
 
     /// Reloads the favorites list from persistent storage.
