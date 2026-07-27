@@ -8,7 +8,8 @@
 import Foundation
 import SwiftUI
 
-enum AppTheme: String, CaseIterable, Codable, Sendable {
+enum AppTheme: String, CaseIterable, Codable, Sendable, Identifiable {
+    var id: String { rawValue }
     case system
     case light
     case dark
@@ -29,6 +30,15 @@ enum AppTheme: String, CaseIterable, Codable, Sendable {
         case .light: return "sun.max.fill"
         case .dark: return "moon.fill"
         case .liquidGlass: return "drop.fill"
+        }
+    }
+
+    var cardBackgroundStyle: AnyShapeStyle {
+        switch self {
+        case .liquidGlass:
+            AnyShapeStyle(Material.ultraThinMaterial)
+        default:
+            AnyShapeStyle(Color(UIColor.secondarySystemBackground))
         }
     }
 }

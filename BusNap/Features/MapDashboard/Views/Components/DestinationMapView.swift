@@ -33,6 +33,7 @@ struct BusStopAnnotation: View {
 @MainActor
 struct StopCallout: View {
     let name: String
+    @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 6) {
@@ -47,7 +48,7 @@ struct StopCallout: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Material.ultraThinMaterial)
+        .background(theme.cardBackgroundStyle)
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -155,6 +156,8 @@ struct DestinationMapView: View {
         .ignoresSafeArea(edges: .all)
     }
 
+    @Environment(\.theme) private var theme
+
     private var settingsButton: some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -164,7 +167,7 @@ struct DestinationMapView: View {
                 .font(.system(size: 18))
                 .foregroundColor(AppConstants.Colors.primaryAccent)
                 .frame(width: 40, height: 40)
-                .background(Material.ultraThinMaterial)
+                .background(theme.cardBackgroundStyle)
                 .clipShape(Circle())
                 .overlay(
                     Circle()

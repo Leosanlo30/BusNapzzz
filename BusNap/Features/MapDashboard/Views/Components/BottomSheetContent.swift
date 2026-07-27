@@ -84,7 +84,7 @@ struct BottomSheetContent: View {
             }
         }
         .padding(12)
-        .background(Material.ultraThinMaterial)
+        .background(viewModel.selectedTheme.cardBackgroundStyle)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -173,7 +173,7 @@ struct BottomSheetContent: View {
                 }
             }
         }
-        .background(Material.ultraThinMaterial)
+        .background(viewModel.selectedTheme.cardBackgroundStyle)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -201,7 +201,7 @@ struct BottomSheetContent: View {
             .buttonStyle(.hapticLight)
         }
         .padding(12)
-        .background(Material.ultraThinMaterial)
+        .background(viewModel.selectedTheme.cardBackgroundStyle)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -224,7 +224,7 @@ struct BottomSheetContent: View {
                                 Circle()
                                     .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
                                     .frame(width: 52, height: 52)
-                                    .background(Material.ultraThinMaterial)
+                                    .background(viewModel.selectedTheme.cardBackgroundStyle)
                                     .clipShape(Circle())
                                 Image(systemName: fav.icon ?? "heart.fill")
                                     .font(.title3)
@@ -298,7 +298,7 @@ struct BottomSheetContent: View {
                 .font(.title3)
                 .foregroundColor(.secondary)
                 .frame(width: 36, height: 36)
-                .background(Material.ultraThinMaterial)
+                .background(viewModel.selectedTheme.cardBackgroundStyle)
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
@@ -430,7 +430,7 @@ struct BottomSheetContent: View {
             }
         }
         .padding(12)
-        .background(Material.ultraThinMaterial)
+        .background(viewModel.selectedTheme.cardBackgroundStyle)
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
