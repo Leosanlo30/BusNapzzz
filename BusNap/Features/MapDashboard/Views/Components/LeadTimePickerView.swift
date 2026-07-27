@@ -38,7 +38,7 @@ struct LeadTimePickerView: View {
                             .foregroundColor(isSelected ? .white : .primary)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.primary.opacity(0.1), lineWidth: isSelected ? 0 : 0.5)
+                                    .stroke(isSelected ? Color.clear : theme.cardBorderColor, lineWidth: isSelected ? 0 : theme.cardBorderWidth)
                             )
                     }
                     .buttonStyle(.plain)

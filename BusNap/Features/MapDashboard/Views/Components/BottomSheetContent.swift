@@ -28,10 +28,15 @@ struct BottomSheetContent: View {
         }
     }
 
+    // Fondo de la lámina (sheet) según el tema activo.
+    // Liquid Glass: .thinMaterial para máxima transparencia.
+    // Dark: negro puro para OLED true black.
     private var sheetBackground: AnyShapeStyle {
         switch viewModel.selectedTheme {
         case .liquidGlass:
-            AnyShapeStyle(.ultraThinMaterial)
+            AnyShapeStyle(Material.thinMaterial)
+        case .dark:
+            AnyShapeStyle(Color.black)
         default:
             AnyShapeStyle(Color(UIColor.systemBackground))
         }
@@ -88,7 +93,7 @@ struct BottomSheetContent: View {
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
         )
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -177,7 +182,7 @@ struct BottomSheetContent: View {
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
         )
     }
 
@@ -205,7 +210,7 @@ struct BottomSheetContent: View {
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
         )
     }
 
@@ -302,7 +307,7 @@ struct BottomSheetContent: View {
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                        .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
                 )
         }
         .buttonStyle(.hapticLight)
@@ -434,7 +439,7 @@ struct BottomSheetContent: View {
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
         )
     }
 

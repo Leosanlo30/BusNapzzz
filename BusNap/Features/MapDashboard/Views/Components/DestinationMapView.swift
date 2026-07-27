@@ -52,7 +52,7 @@ struct StopCallout: View {
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                .stroke(theme.cardBorderColor, lineWidth: theme.cardBorderWidth)
         )
     }
 }
@@ -171,10 +171,11 @@ struct DestinationMapView: View {
                 .clipShape(Circle())
                 .overlay(
                     Circle()
-                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                        .stroke(theme.cardBorderColor, lineWidth: theme.cardBorderWidth)
                 )
                 .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(.hapticLight)
     }
 }
+

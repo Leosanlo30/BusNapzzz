@@ -15,6 +15,8 @@ enum AppTheme: String, CaseIterable, Codable, Sendable, Identifiable {
     case dark
     case liquidGlass
 
+    // MARK: - Propiedades de visualización
+
     var displayName: String {
         switch self {
         case .system: return "System"
@@ -33,13 +35,34 @@ enum AppTheme: String, CaseIterable, Codable, Sendable, Identifiable {
         }
     }
 
+    // MARK: - Fondos para tarjetas
+
+    /// Fondo de las tarjetas según el tema activo.
+    /// - Liquid Glass: .thinMaterial (alta transparencia para efecto vidrio)
+    /// - Dark: negro puro (true black OLED)
+    /// - Otros: fondo secundario del sistema
     var cardBackgroundStyle: AnyShapeStyle {
         switch self {
         case .liquidGlass:
-            AnyShapeStyle(Material.ultraThinMaterial)
+            AnyShapeStyle(Material.thinMaterial)
+        case .dark:
+            AnyShapeStyle(Color.black)
         default:
             AnyShapeStyle(Color(UIColor.secondarySystemBackground))
         }
+    }
+
+    // MARK: - Bordes para efecto vidrio
+
+    /// Color del borde reflectante para tarjetas Liquid Glass.
+    /// En vidrio se usa blanco semitransparente para simular el reflejo del bisel.
+    var cardBorderColor: Color {
+        self == .liquidGlass ? .white.opacity(0.3) : .primary.opacity(0.1)
+    }
+
+    /// Grosor del borde reflectante.
+    var cardBorderWidth: CGFloat {
+        self == .liquidGlass ? 1 : 0.5
     }
 }
 
