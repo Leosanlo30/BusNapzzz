@@ -15,19 +15,31 @@ struct PlaceResult: Identifiable, Codable, Equatable {
     let latitude: Double
     let longitude: Double
 
+    // AQUI: Refactorización de placemark a la API moderna de MapKit para eliminar advertencias de deprecación.
     init(mapItem: MKMapItem) {
-        let coord = mapItem.placemark.location?.coordinate ?? mapItem.placemark.coordinate
+        let coord: CLLocationCoordinate2D
+        if #available(iOS 26.0, *) {
+            coord = mapItem.location?.coordinate ?? mapItem.coordinate
+        } else {
+            coord = mapItem.placemark.location?.coordinate ?? mapItem.placemark.coordinate
+        }
         let lat = coord.latitude
         let lng = coord.longitude
         self.id = "place_\(lat)_\(lng)"
         self.name = mapItem.name ?? "Lugar"
 
-        // Dirección moderna: usa postalAddress + CNPostalAddressFormatter
-        // en lugar de placemark.title (deprecated).
-        if let postal = mapItem.placemark.postalAddress {
-            self.subtitle = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+        if #available(iOS 26.0, *) {
+            if let postal = mapItem.address {
+                self.subtitle = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+            } else {
+                self.subtitle = ""
+            }
         } else {
-            self.subtitle = ""
+            if let postal = mapItem.placemark.postalAddress {
+                self.subtitle = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+            } else {
+                self.subtitle = ""
+            }
         }
 
         self.latitude = lat
