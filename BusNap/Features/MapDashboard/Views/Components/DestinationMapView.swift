@@ -126,12 +126,6 @@ struct DestinationMapView: View {
                 MapCompass()
                 MapPitchToggle()
             }
-            // AQUI: Botón de configuración anclado de forma permanente en la esquina inferior izquierda.
-            .overlay(alignment: .bottomLeading) {
-                settingsButton
-                    .padding(.leading, 20)
-                    .padding(.bottom, 20)
-            }
             // (DESACTIVADO) Navegación a cámara de ruta
 //            .onChange(of: viewModel.selectedRoute) { _, newRoute in
 //                if newRoute != nil, let position = viewModel.routeSearchCamera {
@@ -147,26 +141,6 @@ struct DestinationMapView: View {
         .ignoresSafeArea(edges: .all)
     }
 
-    @Environment(\.theme) private var theme
 
-    private var settingsButton: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            viewModel.showSettings = true
-        }) {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 22))
-                .foregroundColor(AppConstants.Colors.primaryAccent)
-                .frame(width: 44, height: 44)
-                .background(theme.cardBackgroundStyle)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(theme.cardBorderColor, lineWidth: theme.cardBorderWidth)
-                )
-                .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-        }
-        .buttonStyle(.hapticLight)
-    }
 }
 

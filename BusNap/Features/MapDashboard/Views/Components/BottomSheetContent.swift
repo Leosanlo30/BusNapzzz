@@ -226,6 +226,32 @@ struct BottomSheetContent: View {
                     }
                     .buttonStyle(.hapticLight)
                 }
+                // AQUI: Botón de configuración integrado en la hoja de favoritos, se mueve con ella.
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    viewModel.showSettings = true
+                }) {
+                    VStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
+                                .frame(width: 52, height: 52)
+                                .background(viewModel.selectedTheme.cardBackgroundStyle)
+                                .clipShape(Circle())
+                            Image(systemName: "gearshape.fill")
+                                .font(.title3)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
+                        }
+                        Text("Configuración")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(AppConstants.Colors.primaryText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.hapticLight)
             }
         }
     }
