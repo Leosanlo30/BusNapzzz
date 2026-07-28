@@ -13,16 +13,16 @@ import MapKit
 
 // MARK: - MapDashboardViewModel
 
-/// The central view model for the map dashboard screen.
+/// ViewModel central de la pantalla del mapa.
 ///
-/// ``MapDashboardViewModel`` owns all business logic for:
-/// - Loading and filtering bus stops from GeoJSON data.
-/// - Tracking the visible map region and computing which stops are on screen.
-/// - Managing destination selection, search, favorites, trip lifecycle, and
-///   adaptive location-based proximity states.
+/// ``MapDashboardViewModel`` gestiona toda la lógica de negocio para:
+/// - Búsqueda de lugares reales vía MKLocalSearch (Apple Maps).
+/// - Seguimiento de la región visible del mapa.
+/// - Selección de destino, favoritos, ciclo de vida del viaje y
+///   estados de proximidad adaptativa.
 ///
-/// The class is annotated with `@MainActor` and `@Observable` so SwiftUI views
-/// observe its published properties directly.
+/// La clase está anotada con `@MainActor` y `@Observable` para que las
+/// vistas SwiftUI observen sus propiedades publicadas directamente.
 @MainActor
 @Observable
 final class MapDashboardViewModel {
@@ -44,22 +44,21 @@ final class MapDashboardViewModel {
     /// The text currently entered in the search bar.
     var searchText: String = ""
 
-    // MARK: - Bus Stop Properties
+    // MARK: - Resultados de Búsqueda Local (MKLocalSearch)
 
-    /// All bus stops loaded from the GeoJSON file.
-    var busStops: [BusStop] = []
+    /// Resultados en caché para búsquedas offline.
+    private var searchCache: [String: [PlaceResult]] = [:]
 
-    /// A localized error description if loading bus stops failed.
-    var busStopsLoadError: String? = nil
+    /// Resultados de la última búsqueda MKLocalSearch.
+    var searchResults: [PlaceResult] = []
 
-    /// The route name currently selected as a filter, or `nil` if no route is selected.
-    var selectedRoute: String? = nil
-
-    /// Whether the route-search results UI should be visible.
-    var showRouteSearchResults: Bool = false
-
-    /// The bus stop the user has tapped on the map or selected from search.
-    var selectedStop: BusStop? = nil
+    // MARK: - (DESACTIVADO) Propiedades de Paraderos
+    // Se mantienen comentadas para activación futura.
+//    var busStops: [BusStop] = []
+//    var busStopsLoadError: String? = nil
+//    var selectedRoute: String? = nil
+//    var showRouteSearchResults: Bool = false
+//    var selectedStop: BusStop? = nil
 
     // MARK: - Proximity Properties
 
@@ -169,140 +168,34 @@ final class MapDashboardViewModel {
         return north.distance(from: south) < zoomThresholdMeters
     }
 
-    /// A dynamic scale factor (0.35…1.0) for bus-stop annotation icons.
-    ///
-    /// At maximum camera distance (`zoomThresholdMeters`) the scale is 0.35;
-    /// at very close distances it approaches 1.0.
-    var stopAnnotationScale: CGFloat {
-        guard mapCameraDistance > 0 else { return 0.35 }
-        let clamped = min(mapCameraDistance, zoomThresholdMeters)
-        let t = clamped / zoomThresholdMeters
-        return CGFloat(0.35 + (1.0 - t) * 0.65)
-    }
-
-    // MARK: - Computed: Route Names
-
-    /// A sorted, de-duplicated list of all route names found across loaded bus stops.
-    var allRouteNames: [String] {
-        let names = busStops.flatMap(\.routeNames)
-        return Array(Set(names)).sorted()
-    }
-
-    // MARK: - Computed: Filtered Stops
-
-    /// Route names that match the current `searchText` (diacritic‑ and case‑insensitive).
-    var filteredRouteNames: [String] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return [] }
-        let normalizedQuery = normalized(query)
-        return allRouteNames.filter { normalized($0).contains(normalizedQuery) }
-    }
-
-    /// Bus stops that match the current search text and/or selected route filter.
-    var filteredBusStops: [BusStop] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedQuery = normalized(query)
-        var stops = busStops
-
-        if !normalizedQuery.isEmpty {
-            stops = stops.filter { stop in
-                normalized(stop.name).contains(normalizedQuery)
-                || stop.routeNames.contains { normalized($0).contains(normalizedQuery) }
-            }
-        }
-
-        if let route = selectedRoute {
-            stops = stops.filter { $0.routeNames.contains(route) }
-        }
-
-        return stops
-    }
-
-    /// Bus stops that should be shown on the map.
-    ///
-    /// Returns an empty array when the map is zoomed out and no search/route filter is active.
-    var visibleBusStops: [BusStop] {
-        guard !isZoomedIn, selectedRoute == nil, searchText.isEmpty else {
-            return filteredBusStops
-        }
-        return []
-    }
-
-    /// Bus stops that are both visible and within the visible map region.
-    ///
-    /// When the candidate set exceeds 50 stops, a bounding‑box filter clips to the
-    /// current `mapVisibleRegion` so the map renders at most ~50 annotations.
-    var stopsInSight: [BusStop] {
-        let candidates = visibleBusStops
-        guard let region = mapVisibleRegion, candidates.count > 50 else {
-            return candidates
-        }
-        let minLat = region.center.latitude - region.span.latitudeDelta / 2
-        let maxLat = region.center.latitude + region.span.latitudeDelta / 2
-        let minLng = region.center.longitude - region.span.longitudeDelta / 2
-        let maxLng = region.center.longitude + region.span.longitudeDelta / 2
-
-        return candidates.filter { stop in
-            stop.coordinate.latitude >= minLat
-            && stop.coordinate.latitude <= maxLat
-            && stop.coordinate.longitude >= minLng
-            && stop.coordinate.longitude <= maxLng
-        }
-    }
+    // (DESACTIVADO) Escala de anotaciones de paraderos
+//    var stopAnnotationScale: CGFloat {
+//        guard mapCameraDistance > 0 else { return 0.35 }
+//        let clamped = min(mapCameraDistance, zoomThresholdMeters)
+//        let t = clamped / zoomThresholdMeters
+//        return CGFloat(0.35 + (1.0 - t) * 0.65)
+//    }
 
     // MARK: - Computed: Search Suggestions
 
-    /// An array of search suggestions derived from the current `searchText`.
-    ///
-    /// Suggestions include up to 8 route matches, 5 stop‑name matches, and 5 favorite
-    /// matches, all compared with diacritic‑ and case‑insensitive normalization.
+    /// Sugerencias de búsqueda combinando resultados MKLocalSearch y favoritos.
     var searchSuggestions: [SearchSuggestion] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return [] }
-        let normalizedQuery = normalized(query)
-
-        let routeMatches = allRouteNames.filter { normalized($0).contains(normalizedQuery) }
-
-        let stopNameMatches: [BusStop]
-        if !query.isEmpty {
-            stopNameMatches = busStops.filter { normalized($0.name).contains(normalizedQuery) }
-        } else {
-            stopNameMatches = []
-        }
 
         let favoriteMatches = savedFavorites.filter { fav in
             guard let name = fav.name else { return false }
-            return normalized(name).contains(normalizedQuery)
+            return name.localizedCaseInsensitiveContains(query)
         }
 
         var suggestions: [SearchSuggestion] = []
-        for route in routeMatches.prefix(8) {
-            suggestions.append(.route(route))
-        }
-        for stop in stopNameMatches.prefix(5) {
-            suggestions.append(.stop(stop))
+        for place in searchResults.prefix(10) {
+            suggestions.append(.place(place))
         }
         for fav in favoriteMatches.prefix(5) {
             suggestions.append(.favorite(fav))
         }
         return suggestions
-    }
-
-    // MARK: - Computed: Route Camera
-
-    /// A map camera position that fits the filtered bus stops with padding.
-    ///
-    /// Returns `nil` when `filteredBusStops` is empty.
-    var routeSearchCamera: MapCameraPosition? {
-        let stops = filteredBusStops
-        guard !stops.isEmpty else { return nil }
-        let coordinates = stops.map(\.coordinate)
-        let rect = coordinates.reduce(into: MKMapRect.null) { rect, coord in
-            let point = MKMapPoint(coord)
-            rect = rect.union(MKMapRect(origin: point, size: MKMapSize(width: 0, height: 0)))
-        }
-        let padded = rect.insetBy(dx: -rect.size.width * 0.3, dy: -rect.size.height * 0.3)
-        return .rect(padded)
     }
 
     // MARK: - Dependencies
@@ -364,72 +257,99 @@ final class MapDashboardViewModel {
             }
         }
 
-        loadBusStops()
+        // (DESACTIVADO) Carga de paraderos desde GeoJSON
+//        loadBusStops()
     }
 
-    // MARK: - Public: Bus Stop Loading
+    // MARK: - Public: Búsqueda Local (MKLocalSearch)
 
-    /// Loads bus stops from the `PARADEROS_MERIDA.geojson` bundle resource.
-    ///
-    /// Sets `busStops` on success or `busStopsLoadError` on failure.
-    func loadBusStops() {
-        Task {
-            do {
-                let stops = try GeoJSONManager.shared.loadParaderos(from: "PARADEROS_MERIDA")
-                self.busStops = stops
-                self.busStopsLoadError = nil
-            } catch {
-                self.busStopsLoadError = error.localizedDescription
+    /// Ejecuta una búsqueda MKLocalSearch con el texto actual y guarda en caché.
+    @MainActor
+    func performLocalSearch() async {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+
+        // 1. Intentar cargar desde caché offline primero
+        if let cached = loadCachedResults(for: query) {
+            self.searchResults = cached
+            return
+        }
+
+        // 2. Consultar Apple Maps
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+        if let region = mapVisibleRegion {
+            request.region = region
+        }
+
+        let search = MKLocalSearch(request: request)
+        do {
+            let response = try await search.start()
+            let results = response.mapItems.map { PlaceResult(mapItem: $0) }
+            self.searchResults = results
+            saveCachedResults(results, for: query)
+        } catch {
+            print("MKLocalSearch falló: \(error.localizedDescription)")
+            // Si falla la red, intentar caché de nuevo
+            if let cached = loadCachedResults(for: query) {
+                self.searchResults = cached
             }
         }
     }
 
-    // MARK: - Public: Route & Stop Selection
-
-    /// Selects a route to filter the map to only its stops.
-    ///
-    /// - Parameter routeName: The name of the route.
-    func selectRoute(_ routeName: String) {
-        selectedRoute = routeName
-        searchText = routeName
-        showRouteSearchResults = false
-    }
-
-    /// Selects a bus stop from the search list and creates a destination at its location.
-    ///
-    /// - Parameter stop: The bus stop to navigate toward.
-    func selectStop(_ stop: BusStop) {
-        selectedRoute = nil
+    /// Selecciona un PlaceResult y crea un destino con sus coordenadas.
+    func selectPlace(_ place: PlaceResult) {
         searchText = ""
-        selectedStop = stop
         let dest = Destination(
-            name: stop.name,
-            latitude: stop.coordinate.latitude,
-            longitude: stop.coordinate.longitude
+            name: place.name,
+            latitude: place.latitude,
+            longitude: place.longitude
         )
         updateDestination(dest)
     }
 
-    /// Handles a stop selection initiated from a map tap.
-    ///
-    /// - Parameter stop: The tapped stop, or `nil` to deselect.
-    func handleMapStopSelection(_ stop: BusStop?) {
-        selectedStop = stop
-        guard let stop else { return }
-        let dest = Destination(
-            name: stop.name,
-            latitude: stop.coordinate.latitude,
-            longitude: stop.coordinate.longitude
-        )
-        updateDestination(dest)
+    // MARK: - Cache Offline de Búsquedas
+
+    private let cacheFileName = "search_cache.json"
+
+    private func cacheFileURL() -> URL? {
+        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        return paths.first?.appendingPathComponent(cacheFileName)
     }
 
-    /// Clears the active route filter and resets search text.
-    func clearRouteFilter() {
-        selectedRoute = nil
-        searchText = ""
-        showRouteSearchResults = false
+    private func saveCachedResults(_ results: [PlaceResult], for query: String) {
+        var cache = searchCache
+        cache[query] = results
+        searchCache = cache
+        persistCache(cache)
     }
+
+    private func loadCachedResults(for query: String) -> [PlaceResult]? {
+        if let cached = searchCache[query] { return cached }
+        // Intentar cargar desde disco
+        guard let url = cacheFileURL(),
+              let data = try? Data(contentsOf: url),
+              let decoded = try? JSONDecoder().decode([String: [PlaceResult]].self, from: data) else {
+            return nil
+        }
+        searchCache = decoded
+        return decoded[query]
+    }
+
+    private func persistCache(_ cache: [String: [PlaceResult]]) {
+        guard let url = cacheFileURL(),
+              let data = try? JSONEncoder().encode(cache) else { return }
+        try? data.write(to: url)
+    }
+
+    // (DESACTIVADO) Carga de paraderos
+//    func loadBusStops() { ... }
+
+    // MARK: - (DESACTIVADO) Selección de Rutas y Paradas
+//    func selectRoute(_ routeName: String) { ... }
+//    func selectStop(_ stop: BusStop) { ... }
+//    func handleMapStopSelection(_ stop: BusStop?) { ... }
+//    func clearRouteFilter() { ... }
 
     // MARK: - Public: Map Region
 
@@ -741,22 +661,18 @@ extension MapDashboardViewModel {
 
 // MARK: - SearchSuggestion
 
-/// A search result item presented in the bottom sheet's suggestion list.
+/// Elemento de sugerencia presentado en la lista del sheet inferior.
 enum SearchSuggestion: Identifiable {
 
-    /// A route name match.
-    case route(String)
+    /// Un lugar real obtenido de MKLocalSearch.
+    case place(PlaceResult)
 
-    /// A bus-stop name match.
-    case stop(BusStop)
-
-    /// A saved favorite destination match.
+    /// Un destino favorito guardado por el usuario.
     case favorite(Destination)
 
     var id: String {
         switch self {
-        case .route(let name): return "route_\(name)"
-        case .stop(let stop): return "stop_\(stop.id)"
+        case .place(let place): return place.id
         case .favorite(let dest): return "fav_\(dest.latitude)_\(dest.longitude)"
         }
     }

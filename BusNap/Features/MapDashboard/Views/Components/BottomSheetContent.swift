@@ -50,10 +50,11 @@ struct BottomSheetContent: View {
                 searchBar
                     .padding(.bottom, 20)
 
-                if viewModel.selectedRoute != nil {
-                    routeFilterBar
-                        .padding(.bottom, 16)
-                }
+                // (DESACTIVADO) Filtro de ruta de paraderos
+//                if viewModel.selectedRoute != nil {
+//                    routeFilterBar
+//                        .padding(.bottom, 16)
+//                }
 
                 if !viewModel.searchSuggestions.isEmpty {
                     searchSuggestionsList
@@ -71,18 +72,14 @@ struct BottomSheetContent: View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-            TextField("Buscar parada…", text: $viewModel.searchText)
+            TextField("Buscar lugar…", text: $viewModel.searchText)
                 .font(.body)
                 .submitLabel(.search)
                 .onSubmit {
-                    if let first = viewModel.filteredRouteNames.first {
-                        viewModel.selectRoute(first)
-                    } else if let first = viewModel.searchSuggestions.first(where: { if case .stop = $0 { return true }; return false }) {
-                        if case .stop(let stop) = first { viewModel.selectStop(stop) }
-                    }
+                    Task { await viewModel.performLocalSearch() }
                 }
             if !viewModel.searchText.isEmpty {
-                Button(action: { viewModel.clearRouteFilter() }) {
+                Button(action: { viewModel.searchText = ""; viewModel.searchResults = [] }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.secondary)
                 }
@@ -102,40 +99,32 @@ struct BottomSheetContent: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(viewModel.searchSuggestions) { suggestion in
                 switch suggestion {
-                case .route(let name):
-                    Button(action: { viewModel.selectRoute(name) }) {
+                // (DESACTIVADO) Sugerencias de rutas de paraderos
+//                case .route(let name):
+//                    Button(action: { viewModel.selectRoute(name) }) {
+//                        ...
+//                    }
+//                    .buttonStyle(.plain)
+//
+//                case .stop(let stop):
+//                    Button(action: { viewModel.selectStop(stop) }) {
+//                        ...
+//                    }
+//                    .buttonStyle(.plain)
+
+                case .place(let place):
+                    Button(action: { viewModel.selectPlace(place) }) {
                         HStack(spacing: 10) {
-                            Image(systemName: "bus.fill")
+                            Image(systemName: "mappin.circle.fill")
                                 .font(.caption)
                                 .foregroundColor(AppConstants.Colors.primaryAccent)
                                 .frame(width: 24)
-                            Text(name)
-                                .font(.subheadline)
-                                .foregroundColor(AppConstants.Colors.primaryText)
-                                .lineLimit(1)
-                            Spacer()
-                            Image(systemName: "arrow.up.left.square")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
-                    }
-                    .buttonStyle(.plain)
-
-                case .stop(let stop):
-                    Button(action: { viewModel.selectStop(stop) }) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "bus.fill")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                                .frame(width: 24)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(stop.name)
+                                Text(place.name)
                                     .font(.subheadline)
                                     .foregroundColor(AppConstants.Colors.primaryText)
                                     .lineLimit(1)
-                                Text(stop.routeNames.prefix(3).joined(separator: ", "))
+                                Text(place.subtitle)
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)
@@ -143,7 +132,7 @@ struct BottomSheetContent: View {
                             Spacer()
                             Image(systemName: "location.circle")
                                 .font(.caption)
-                                .foregroundColor(.orange)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
                         }
                         .padding(.vertical, 8)
                         .padding(.horizontal, 12)
@@ -186,33 +175,34 @@ struct BottomSheetContent: View {
         )
     }
 
-    private var routeFilterBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                .foregroundColor(AppConstants.Colors.primaryAccent)
-            Text(viewModel.selectedRoute ?? "")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .lineLimit(1)
-            Spacer()
-            Text("\(viewModel.filteredBusStops.count) paradas")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Button(action: { viewModel.clearRouteFilter() }) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.secondary)
-                    .font(.title3)
-            }
-            .buttonStyle(.hapticLight)
-        }
-        .padding(12)
-        .background(viewModel.selectedTheme.cardBackgroundStyle)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
-        )
-    }
+    // (DESACTIVADO) Barra de filtro de ruta de paraderos
+//    private var routeFilterBar: some View {
+//        HStack(spacing: 8) {
+//            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+//                .foregroundColor(AppConstants.Colors.primaryAccent)
+//            Text(viewModel.selectedRoute ?? "")
+//                .font(.subheadline)
+//                .fontWeight(.semibold)
+//                .lineLimit(1)
+//            Spacer()
+//            Text("\(viewModel.filteredBusStops.count) paradas")
+//                .font(.caption)
+//                .foregroundColor(.secondary)
+//            Button(action: { viewModel.clearRouteFilter() }) {
+//                Image(systemName: "xmark.circle.fill")
+//                    .foregroundColor(.secondary)
+//                    .font(.title3)
+//            }
+//            .buttonStyle(.hapticLight)
+//        }
+//        .padding(12)
+//        .background(viewModel.selectedTheme.cardBackgroundStyle)
+//        .cornerRadius(12)
+//        .overlay(
+//            RoundedRectangle(cornerRadius: 12)
+//                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
+//        )
+//    }
 
     private var favoritesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
