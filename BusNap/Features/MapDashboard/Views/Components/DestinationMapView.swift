@@ -120,20 +120,20 @@ struct DestinationMapView: View {
                 )
                 viewModel.updateDestination(newDestination)
             }
-            .mapControls {
-                MapUserLocationButton()
-                MapCompass()
-                MapPitchToggle()
-            }
             .safeAreaPadding(.top, 100)
-            // AQUI: Botón de configuración ajustado en tamaño y posición para evitar colisiones.
-            .overlay(alignment: .topTrailing) {
-                VStack(spacing: 0) {
+            // AQUI: Botones flotantes agrupados en VStack para evitar colisiones.
+            .safeAreaInset(edge: .trailing) {
+                VStack(alignment: .trailing, spacing: 12) {
+                    MapUserLocationButton()
+                        .controlSize(.regular)
+                    MapCompass()
+                        .controlSize(.regular)
+                    MapPitchToggle()
+                        .controlSize(.regular)
                     settingsButton
-                        .padding(.top, 4)
                 }
-                .padding(.top, 140)
-                .padding(.trailing, 12)
+                .padding(.trailing, 8)
+                .padding(.vertical, 8)
             }
             // (DESACTIVADO) Navegación a cámara de ruta
 //            .onChange(of: viewModel.selectedRoute) { _, newRoute in
