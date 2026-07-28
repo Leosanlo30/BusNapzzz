@@ -126,11 +126,11 @@ struct DestinationMapView: View {
                 MapCompass()
                 MapPitchToggle()
             }
-            // AQUI: Botón de configuración movido hacia abajo de forma aislada, sin alterar los otros botones.
-            .overlay(alignment: .bottomTrailing) {
+            // AQUI: Botón de configuración anclado de forma permanente en la esquina inferior izquierda.
+            .overlay(alignment: .bottomLeading) {
                 settingsButton
-                    .padding(.bottom, 48)
-                    .padding(.trailing, 12)
+                    .padding(.leading, 20)
+                    .padding(.bottom, 20)
             }
             // (DESACTIVADO) Navegación a cámara de ruta
 //            .onChange(of: viewModel.selectedRoute) { _, newRoute in
