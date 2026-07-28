@@ -20,6 +20,7 @@ struct BusNapApp: App {
                 .preferredColorScheme(colorScheme)
                 .environment(\.theme, viewModel.selectedTheme)
                 .transaction { $0.animation = nil }
+                .onAppear { viewModel.applyPersistedThemeToWindows() }
                 .onChange(of: scenePhase) { _, newPhase in
                     viewModel.handleScenePhase(newPhase)
                 }

@@ -546,11 +546,17 @@ final class MapDashboardViewModel {
         preferencesStore.saveLeadTime(newTime)
     }
 
-    /// Updates the app theme instantly — no animation.
+    /// Updates the app theme instantly — no animation, no cross-fade.
     ///
     /// - Parameter theme: The new theme to apply.
     func updateTheme(_ theme: AppTheme) {
         selectedTheme = theme
+        ThemeApplier.apply(theme)
+    }
+
+    /// Applies the currently persisted theme to all windows (called on launch).
+    func applyPersistedThemeToWindows() {
+        ThemeApplier.apply(selectedTheme)
     }
 
     // MARK: - Public: Scene Phase
