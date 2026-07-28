@@ -29,12 +29,12 @@ struct BottomSheetContent: View {
     }
 
     // Fondo de la lámina (sheet) según el tema activo.
-    // Liquid Glass: .thinMaterial para máxima transparencia.
+    // Liquid Glass: .ultraThinMaterial para máxima transparencia.
     // Dark: negro puro para OLED true black.
     private var sheetBackground: AnyShapeStyle {
         switch viewModel.selectedTheme {
         case .liquidGlass:
-            AnyShapeStyle(Material.thinMaterial)
+            AnyShapeStyle(Material.ultraThinMaterial)
         case .dark:
             AnyShapeStyle(Color.black)
         default:

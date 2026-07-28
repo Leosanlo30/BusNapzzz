@@ -491,7 +491,7 @@ final class MapDashboardViewModel {
 
         AudioManager.shared.prepareAudioEngine()
         withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-            tripEngine.startTrip(to: destination, leadTime: leadTime)
+            tripEngine.startTrip(to: destination, leadTime: leadTime, soundName: ringtoneName)
             isPaused = false
             errorMessage = nil
             updateDetentForCurrentState()

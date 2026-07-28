@@ -38,13 +38,13 @@ enum AppTheme: String, CaseIterable, Codable, Sendable, Identifiable {
     // MARK: - Fondos para tarjetas
 
     /// Fondo de las tarjetas según el tema activo.
-    /// - Liquid Glass: .thinMaterial (alta transparencia para efecto vidrio)
+    /// - Liquid Glass: transparente para que el material del contenedor principal haga el efecto vidrio
     /// - Dark: negro puro (true black OLED)
     /// - Otros: fondo secundario del sistema
     var cardBackgroundStyle: AnyShapeStyle {
         switch self {
         case .liquidGlass:
-            AnyShapeStyle(Material.thinMaterial)
+            AnyShapeStyle(Color.clear)
         case .dark:
             AnyShapeStyle(Color.black)
         default:
