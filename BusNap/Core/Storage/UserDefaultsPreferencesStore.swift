@@ -47,7 +47,7 @@ struct UserDefaultsPreferencesStore: UserPreferencesStoring {
     func loadTheme() -> AppTheme {
         guard let raw = UserDefaults.standard.string(forKey: themeKey),
               let theme = AppTheme(rawValue: raw) else {
-            return .liquidGlass
+            return .system
         }
         return theme
     }

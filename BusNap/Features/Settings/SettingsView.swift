@@ -139,13 +139,11 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
 
-            if viewModel.selectedTheme == .liquidGlass || viewModel.selectedTheme == .system {
+            if viewModel.selectedTheme == .system {
                 HStack {
                     Image(systemName: "info.circle")
                         .foregroundColor(AppConstants.Colors.secondaryText)
-                    Text(viewModel.selectedTheme == .liquidGlass
-                         ? "Los paneles se vuelven translúcidos para mostrar el mapa detrás."
-                         : "Sigue la apariencia del sistema.")
+                    Text("Sigue la apariencia del sistema.")
                         .font(.caption)
                         .foregroundColor(AppConstants.Colors.secondaryText)
                 }

@@ -2,7 +2,6 @@ import SwiftUI
 
 struct LeadTimePickerView: View {
     var viewModel: MapDashboardViewModel
-    @Environment(\.theme) private var theme
 
     private var options: [AlertLeadTime] {
         [
@@ -32,13 +31,13 @@ struct LeadTimePickerView: View {
                             .background(
                                 isSelected
                                     ? AnyShapeStyle(AppConstants.Colors.primaryAccent)
-                                    : theme.cardBackgroundStyle,
+                                    : AnyShapeStyle(Color(UIColor.secondarySystemBackground)),
                                 in: RoundedRectangle(cornerRadius: 10)
                             )
                             .foregroundColor(isSelected ? .white : .primary)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(isSelected ? Color.clear : theme.cardBorderColor, lineWidth: isSelected ? 0 : theme.cardBorderWidth)
+                                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
                             )
                     }
                     .buttonStyle(.plain)

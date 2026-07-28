@@ -10,7 +10,7 @@ struct BusNapApp: App {
         switch viewModel.selectedTheme {
         case .light: return .light
         case .dark: return .dark
-        case .system, .liquidGlass: return nil
+        case .system: return nil
         }
     }
 

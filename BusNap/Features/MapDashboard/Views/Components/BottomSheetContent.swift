@@ -28,18 +28,8 @@ struct BottomSheetContent: View {
         }
     }
 
-    // Fondo de la lámina (sheet) según el tema activo.
-    // Liquid Glass: .ultraThinMaterial para máxima transparencia.
-    // Dark: negro puro para OLED true black.
     private var sheetBackground: AnyShapeStyle {
-        switch viewModel.selectedTheme {
-        case .liquidGlass:
-            AnyShapeStyle(Material.ultraThinMaterial)
-        case .dark:
-            AnyShapeStyle(Color.black)
-        default:
-            AnyShapeStyle(Color(UIColor.systemBackground))
-        }
+        AnyShapeStyle(Color(UIColor.systemBackground))
     }
 
     // MARK: - Initial State
@@ -210,10 +200,8 @@ struct BottomSheetContent: View {
                         VStack(spacing: 6) {
                             ZStack {
                                 Circle()
-                                    .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
+                                    .fill(AppConstants.Colors.primaryAccent.opacity(0.12))
                                     .frame(width: 52, height: 52)
-                                    .background(viewModel.selectedTheme.cardBackgroundStyle)
-                                    .clipShape(Circle())
                                 Image(systemName: fav.icon ?? "heart.fill")
                                     .font(.title3)
                                     .foregroundColor(AppConstants.Colors.primaryAccent)

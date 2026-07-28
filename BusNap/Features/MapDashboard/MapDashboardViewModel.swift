@@ -127,11 +127,11 @@ final class MapDashboardViewModel {
     }
 
     /// The raw `@AppStorage` backing for the selected theme.
-    @ObservationIgnored @AppStorage("appTheme") private var appThemeRaw = AppTheme.liquidGlass.rawValue
+    @ObservationIgnored @AppStorage("appTheme") private var appThemeRaw = AppTheme.system.rawValue
 
     /// The app's current theme, read from and written to `UserDefaults`.
     var selectedTheme: AppTheme {
-        get { AppTheme(rawValue: appThemeRaw) ?? .liquidGlass }
+        get { AppTheme(rawValue: appThemeRaw) ?? .system }
         set {
             appThemeRaw = newValue.rawValue
             preferencesStore.saveTheme(newValue)
