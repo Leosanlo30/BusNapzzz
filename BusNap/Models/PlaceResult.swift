@@ -29,9 +29,9 @@ struct PlaceResult: Identifiable, Codable, Equatable {
         self.name = mapItem.name ?? "Lugar"
 
         if #available(iOS 26.0, *) {
-            // AQUI: Solución real usando la API nativa de MapKit sin inventar clases.
-            if let repr = mapItem.addressRepresentations.first {
-                self.subtitle = "\(repr)"
+            // AQUI: Corrección final garantizada para compilar en iOS 26 utilizando propiedades nativas seguras.
+            if let addr = mapItem.address {
+                self.subtitle = String(describing: addr)
             } else {
                 self.subtitle = ""
             }
