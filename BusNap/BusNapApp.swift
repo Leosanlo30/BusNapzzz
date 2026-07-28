@@ -17,6 +17,7 @@ struct BusNapApp: App {
     var body: some Scene {
         WindowGroup {
             MapDashboardView(viewModel: viewModel)
+                .id(viewModel.selectedTheme)
                 .preferredColorScheme(colorScheme)
                 .environment(\.theme, viewModel.selectedTheme)
                 .transaction { $0.animation = nil }

@@ -126,15 +126,11 @@ final class MapDashboardViewModel {
         didSet { UserDefaults.standard.set(customLeadTimeMinutes, forKey: "customLeadTime") }
     }
 
-    /// The raw `@AppStorage` backing for the selected theme.
-    @ObservationIgnored @AppStorage("appTheme") private var appThemeRaw = AppTheme.system.rawValue
-
-    /// The app's current theme, read from and written to `UserDefaults`.
+    /// The app's current theme — tracked by @Observable for reactive UI updates.
     var selectedTheme: AppTheme {
-        get { AppTheme(rawValue: appThemeRaw) ?? .system }
-        set {
-            appThemeRaw = newValue.rawValue
-            preferencesStore.saveTheme(newValue)
+        didSet {
+            UserDefaults.standard.set(selectedTheme.rawValue, forKey: "appTheme")
+            preferencesStore.saveTheme(selectedTheme)
         }
     }
 
@@ -235,10 +231,7 @@ final class MapDashboardViewModel {
 
         self.leadTime = self.preferencesStore.loadLeadTime()
         self.ringtoneName = UserDefaults.standard.string(forKey: "ringtoneName") ?? "alarm"
-        let storedTheme = self.preferencesStore.loadTheme()
-        if storedTheme.rawValue != self.appThemeRaw {
-            self.appThemeRaw = storedTheme.rawValue
-        }
+        self.selectedTheme = self.preferencesStore.loadTheme()
 
         self.networkMonitor.setStatusHandler { [weak self] offline in
             guard let self = self else { return }

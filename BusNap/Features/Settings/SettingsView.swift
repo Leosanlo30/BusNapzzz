@@ -117,7 +117,11 @@ struct SettingsView: View {
     private var themeSection: some View {
         Section("Apariencia") {
             ForEach(AppTheme.allCases, id: \.self) { theme in
-                Button(action: { viewModel.updateTheme(theme) }) {
+                Button(action: {
+                    var t = Transaction()
+                    t.disablesAnimations = true
+                    withTransaction(t) { viewModel.updateTheme(theme) }
+                }) {
                     HStack {
                         Image(systemName: theme.systemImage)
                             .foregroundColor(AppConstants.Colors.primaryAccent)
