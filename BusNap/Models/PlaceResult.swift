@@ -29,13 +29,9 @@ struct PlaceResult: Identifiable, Codable, Equatable {
         self.name = mapItem.name ?? "Lugar"
 
         if #available(iOS 26.0, *) {
-            // MKAddress replaces CNPostalAddress; build string from its components
+            // AQUI: Corrección de propiedades de MKAddress para extraer la dirección correctamente.
             if let addr = mapItem.address {
-                var parts: [String] = []
-                if let s = addr.street { parts.append(s) }
-                if let c = addr.city { parts.append(c) }
-                if let st = addr.state { parts.append(st) }
-                self.subtitle = parts.joined(separator: ", ")
+                self.subtitle = addr.formattedAddress
             } else {
                 self.subtitle = ""
             }
