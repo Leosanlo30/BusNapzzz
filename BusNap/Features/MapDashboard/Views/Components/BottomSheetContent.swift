@@ -86,12 +86,7 @@ struct BottomSheetContent: View {
             }
         }
         .padding(12)
-        .background(viewModel.selectedTheme.cardBackgroundStyle)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
-        )
+        .themeCard(cornerRadius: 12)
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -167,12 +162,7 @@ struct BottomSheetContent: View {
                 }
             }
         }
-        .background(viewModel.selectedTheme.cardBackgroundStyle)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
-        )
+        .themeCard(cornerRadius: 12)
     }
 
     // (DESACTIVADO) Barra de filtro de ruta de paraderos
@@ -293,12 +283,7 @@ struct BottomSheetContent: View {
                 .font(.title3)
                 .foregroundColor(.secondary)
                 .frame(width: 36, height: 36)
-                .background(viewModel.selectedTheme.cardBackgroundStyle)
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
-                )
+                .themeCard(cornerRadius: 10)
         }
         .buttonStyle(.hapticLight)
     }
@@ -425,12 +410,7 @@ struct BottomSheetContent: View {
             }
         }
         .padding(12)
-        .background(viewModel.selectedTheme.cardBackgroundStyle)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
-        )
+        .themeCard(cornerRadius: 10)
     }
 
     // MARK: - Active State

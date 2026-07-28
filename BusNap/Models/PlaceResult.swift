@@ -1,9 +1,13 @@
 import Foundation
 import MapKit
+import Contacts
 
 // MARK: - PlaceResult
 
 /// Resultado de una búsqueda MKLocalSearch, conforme a Codable para persistencia offline.
+///
+/// Extrae los datos usando `location`, `address` y `addressRepresentations` en lugar de
+/// la propiedad `title` (deprecated) de `MKPlacemark`.
 struct PlaceResult: Identifiable, Codable, Equatable {
     let id: String
     let name: String
@@ -12,11 +16,20 @@ struct PlaceResult: Identifiable, Codable, Equatable {
     let longitude: Double
 
     init(mapItem: MKMapItem) {
-        let lat = mapItem.placemark.coordinate.latitude
-        let lng = mapItem.placemark.coordinate.longitude
+        let coord = mapItem.placemark.location?.coordinate ?? mapItem.placemark.coordinate
+        let lat = coord.latitude
+        let lng = coord.longitude
         self.id = "place_\(lat)_\(lng)"
         self.name = mapItem.name ?? "Lugar"
-        self.subtitle = mapItem.placemark.title ?? ""
+
+        // Dirección moderna: usa postalAddress + CNPostalAddressFormatter
+        // en lugar de placemark.title (deprecated).
+        if let postal = mapItem.placemark.postalAddress {
+            self.subtitle = CNPostalAddressFormatter.string(from: postal, style: .mailingAddress)
+        } else {
+            self.subtitle = ""
+        }
+
         self.latitude = lat
         self.longitude = lng
     }
