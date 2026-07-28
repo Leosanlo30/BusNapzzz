@@ -19,6 +19,7 @@ struct BusNapApp: App {
             MapDashboardView(viewModel: viewModel)
                 .preferredColorScheme(colorScheme)
                 .environment(\.theme, viewModel.selectedTheme)
+                .transaction { $0.animation = nil }
                 .onChange(of: scenePhase) { _, newPhase in
                     viewModel.handleScenePhase(newPhase)
                 }

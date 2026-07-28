@@ -546,13 +546,11 @@ final class MapDashboardViewModel {
         preferencesStore.saveLeadTime(newTime)
     }
 
-    /// Updates the app theme with an animation.
+    /// Updates the app theme instantly — no animation.
     ///
     /// - Parameter theme: The new theme to apply.
     func updateTheme(_ theme: AppTheme) {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            selectedTheme = theme
-        }
+        selectedTheme = theme
     }
 
     // MARK: - Public: Scene Phase
