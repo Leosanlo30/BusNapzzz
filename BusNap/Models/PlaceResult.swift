@@ -29,10 +29,9 @@ struct PlaceResult: Identifiable, Codable, Equatable {
         self.name = mapItem.name ?? "Lugar"
 
         if #available(iOS 26.0, *) {
-            // AQUI: Corrección definitiva y verificada de la dirección para iOS 26 sin errores de compilación.
-            if let addr = mapItem.address {
-                let formatter = MKAddressFormatter()
-                self.subtitle = formatter.string(from: addr)
+            // AQUI: Solución real usando la API nativa de MapKit sin inventar clases.
+            if let repr = mapItem.addressRepresentations.first {
+                self.subtitle = "\(repr)"
             } else {
                 self.subtitle = ""
             }
