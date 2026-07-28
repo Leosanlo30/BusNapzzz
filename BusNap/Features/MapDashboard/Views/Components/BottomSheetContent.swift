@@ -63,7 +63,10 @@ struct BottomSheetContent: View {
 
                 if !viewModel.savedFavorites.isEmpty {
                     favoritesSection
+                        .padding(.bottom, 16)
                 }
+
+                settingsButton
             }
         }
     }
@@ -226,34 +229,37 @@ struct BottomSheetContent: View {
                     }
                     .buttonStyle(.hapticLight)
                 }
-                // AQUI: Botón de configuración integrado en la hoja de favoritos, se mueve con ella.
-                Button(action: {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    viewModel.showSettings = true
-                }) {
-                    VStack(spacing: 6) {
-                        ZStack {
-                            Circle()
-                                .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
-                                .frame(width: 52, height: 52)
-                                .background(viewModel.selectedTheme.cardBackgroundStyle)
-                                .clipShape(Circle())
-                            Image(systemName: "gearshape.fill")
-                                .font(.title3)
-                                .foregroundColor(AppConstants.Colors.primaryAccent)
-                        }
-                        Text("Configuración")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(AppConstants.Colors.primaryText)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.hapticLight)
             }
         }
+    }
+
+    private var settingsButton: some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            viewModel.showSettings = true
+        }) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppConstants.Colors.primaryAccent)
+                }
+                Text("Configuración")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(AppConstants.Colors.primaryText)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(12)
+            .themeCard(cornerRadius: 12)
+        }
+        .buttonStyle(.hapticLight)
     }
 
     // MARK: - Configuring State
