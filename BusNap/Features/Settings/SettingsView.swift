@@ -22,7 +22,6 @@ struct SettingsView: View {
                 customTimeSection
                 vibrationSection
                 ringtoneSection
-                themeSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Configuración")
@@ -112,48 +111,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Themes
-
-    private var themeSection: some View {
-        Section("Apariencia") {
-            ForEach(AppTheme.allCases, id: \.self) { theme in
-                Button(action: {
-                    var t = Transaction()
-                    t.disablesAnimations = true
-                    withTransaction(t) { viewModel.updateTheme(theme) }
-                }) {
-                    HStack {
-                        Image(systemName: theme.systemImage)
-                            .foregroundColor(AppConstants.Colors.primaryAccent)
-                            .frame(width: 28)
-
-                        Text(theme.displayName)
-                            .font(.subheadline)
-                            .foregroundColor(AppConstants.Colors.primaryText)
-
-                        Spacer()
-
-                        if theme == viewModel.selectedTheme {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(AppConstants.Colors.primaryAccent)
-                                .font(.subheadline)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-
-            if viewModel.selectedTheme == .system {
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(AppConstants.Colors.secondaryText)
-                    Text("Sigue la apariencia del sistema.")
-                        .font(.caption)
-                        .foregroundColor(AppConstants.Colors.secondaryText)
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Ringtone Picker

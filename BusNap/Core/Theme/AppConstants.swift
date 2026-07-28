@@ -5,31 +5,7 @@
 //  Created by Leonardo Ariel San Martin Lopez  on 08/07/26.
 //
 
-import Foundation
 import SwiftUI
-
-enum AppTheme: String, CaseIterable, Codable, Sendable, Identifiable {
-    var id: String { rawValue }
-    case system
-    case light
-    case dark
-
-    var displayName: String {
-        switch self {
-        case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .system: return "gearshape"
-        case .light: return "sun.max.fill"
-        case .dark: return "moon.fill"
-        }
-    }
-}
 
 enum AppConstants {
     

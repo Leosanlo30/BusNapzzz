@@ -12,6 +12,4 @@ protocol UserPreferencesStoring: Sendable {
     func loadLeadTime() -> AlertLeadTime
     func saveFavorites(_ favorites: [Destination])
     func loadFavorites() -> [Destination]
-    func saveTheme(_ theme: AppTheme)
-    func loadTheme() -> AppTheme
 }

@@ -179,11 +179,11 @@ struct BottomSheetContent: View {
 //            .buttonStyle(.hapticLight)
 //        }
 //        .padding(12)
-//        .background(viewModel.selectedTheme.cardBackgroundStyle)
+//        .background(Color(UIColor.secondarySystemBackground))
 //        .cornerRadius(12)
 //        .overlay(
 //            RoundedRectangle(cornerRadius: 12)
-//                .stroke(viewModel.selectedTheme.cardBorderColor, lineWidth: viewModel.selectedTheme.cardBorderWidth)
+//                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
 //        )
 //    }
 

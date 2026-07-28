@@ -126,14 +126,6 @@ final class MapDashboardViewModel {
         didSet { UserDefaults.standard.set(customLeadTimeMinutes, forKey: "customLeadTime") }
     }
 
-    /// The app's current theme — tracked by @Observable for reactive UI updates.
-    var selectedTheme: AppTheme {
-        didSet {
-            UserDefaults.standard.set(selectedTheme.rawValue, forKey: "appTheme")
-            preferencesStore.saveTheme(selectedTheme)
-        }
-    }
-
     /// The set of detents the bottom sheet can snap to.
     var currentDetents: Set<PresentationDetent> {
         [.fraction(0.25), .medium, .large]
@@ -231,7 +223,6 @@ final class MapDashboardViewModel {
 
         self.leadTime = self.preferencesStore.loadLeadTime()
         self.ringtoneName = UserDefaults.standard.string(forKey: "ringtoneName") ?? "alarm"
-        self.selectedTheme = self.preferencesStore.loadTheme()
 
         self.networkMonitor.setStatusHandler { [weak self] offline in
             guard let self = self else { return }
@@ -537,19 +528,6 @@ final class MapDashboardViewModel {
     func updateLeadTime(_ newTime: AlertLeadTime) {
         self.leadTime = newTime
         preferencesStore.saveLeadTime(newTime)
-    }
-
-    /// Updates the app theme instantly — no animation, no cross-fade.
-    ///
-    /// - Parameter theme: The new theme to apply.
-    func updateTheme(_ theme: AppTheme) {
-        selectedTheme = theme
-        ThemeApplier.apply(theme)
-    }
-
-    /// Applies the currently persisted theme to all windows (called on launch).
-    func applyPersistedThemeToWindows() {
-        ThemeApplier.apply(selectedTheme)
     }
 
     // MARK: - Public: Scene Phase

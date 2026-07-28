@@ -52,11 +52,11 @@ import MapKit
 //        }
 //        .padding(.horizontal, 12)
 //        .padding(.vertical, 6)
-//        .background(theme.cardBackgroundStyle)
+//        .background(Color(UIColor.secondarySystemBackground))
 //        .cornerRadius(8)
 //        .overlay(
 //            RoundedRectangle(cornerRadius: 8)
-//                .stroke(theme.cardBorderColor, lineWidth: theme.cardBorderWidth)
+//                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
 //        )
 //    }
 //}
