@@ -15,6 +15,7 @@ final class TripEngine {
     // MARK: - Estado Público
     private(set) var state: TripState = .idle
     private(set) var currentDestination: Destination? = nil
+    var soundName: String = "alarm"
     
     // MARK: - Dependencias Inyectadas
     @ObservationIgnored private let geofenceMonitor: GeofenceMonitor
@@ -39,14 +40,15 @@ final class TripEngine {
     private func setupGeofenceBindings() {
         geofenceMonitor.onRegionEntered = { [weak self] identifier in
             guard let self = self else { return }
-            self.handleCriticalZoneEntry(for: identifier)
+            self.handleCriticalZoneEntry(for: identifier, soundName: self.soundName)
         }
     }
     
     // MARK: - Intenciones (Ciclo de Vida)
     
-    func startTrip(to destination: Destination, leadTime: AlertLeadTime) {
+    func startTrip(to destination: Destination, leadTime: AlertLeadTime, soundName: String = "alarm") {
         self.currentDestination = destination
+        self.soundName = soundName
         
         self.state = .monitoring
         
@@ -94,20 +96,23 @@ final class TripEngine {
     }
     
     // MARK: - Manejadores de Eventos
-    
-    private func handleCriticalZoneEntry(for identifier: String) {
+
+    func triggerArrival(for destinationName: String, soundName: String) {
+        handleCriticalZoneEntry(for: destinationName, soundName: soundName)
+    }
+
+    private func handleCriticalZoneEntry(for identifier: String, soundName: String) {
+        guard state != .alarmTriggered else { return }
         Task { @MainActor in
-            
             self.state = .criticalZone
-            AudioManager.shared.playAlarm() // Alarma encendida
+            AudioManager.shared.playAlarm(soundName: soundName)
             
             let destName = self.currentDestination?.name ?? "tu parada"
             let title = "¡Despierta!"
             let body = "Estás llegando a \(destName). Es hora de bajar del autobús."
             
-            
             do {
-                try await notificationManager.scheduleWakeUpAlarm(title: title, body: body)
+                try await notificationManager.scheduleWakeUpAlarm(title: title, body: body, soundName: soundName)
                 self.state = .alarmTriggered
             } catch {
                 print(" TripEngine: Falló el disparo de la alarma - \(error.localizedDescription)")

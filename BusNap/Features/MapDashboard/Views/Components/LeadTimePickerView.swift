@@ -19,7 +19,7 @@ struct LeadTimePickerView: View {
                 .foregroundColor(AppConstants.Colors.secondaryText)
 
             HStack(spacing: 12) {
-                ForEach(options) { option in
+                ForEach(options, id: \.id) { option in
                     let isSelected = viewModel.leadTime.minutes == option.minutes
 
                     Button(action: {
@@ -27,24 +27,24 @@ struct LeadTimePickerView: View {
                     }) {
                         Text(option.displayTitle)
                             .font(.system(size: 14, weight: isSelected ? .bold : .medium))
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 8)
-                            .frame(maxWidth: .infinity)
-                            .background(isSelected ? AppConstants.Colors.primaryAccent : Color(UIColor.tertiarySystemFill))
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(
+                                isSelected
+                                    ? AnyShapeStyle(AppConstants.Colors.primaryAccent)
+                                    : AnyShapeStyle(Color(UIColor.secondarySystemBackground)),
+                                in: RoundedRectangle(cornerRadius: 10)
+                            )
                             .foregroundColor(isSelected ? .white : .primary)
-                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                            )
                     }
                     .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
                     .animation(.easeInOut(duration: 0.2), value: isSelected)
                 }
             }
         }
     }
-}
-
-#Preview {
-    @MainActor in
-    let mockVM = MapDashboardViewModel()
-    return LeadTimePickerView(viewModel: mockVM)
-        .padding()
 }

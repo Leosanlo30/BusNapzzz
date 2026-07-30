@@ -22,4 +22,9 @@ protocol LocationManaging {
     func disableEcoMode()
     
     func setLocationHandler(_ handler: @escaping (CLLocation) -> Void) //comunicación para enviar las coordenadas al ViewModel
+
+    // MARK: - Adaptive Targeting
+    func setDestination(_ coordinate: CLLocationCoordinate2D)
+    func clearDestination()
+    var distanceToDestination: CLLocationDistance? { get }
 }

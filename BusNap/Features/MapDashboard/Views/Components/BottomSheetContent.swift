@@ -2,8 +2,8 @@ import SwiftUI
 
 struct BottomSheetContent: View {
     @Bindable var viewModel: MapDashboardViewModel
-    let onOpenSettings: () -> Void
     @FocusState private var isNameFocused: Bool
+    @State private var isSaved = false
 
     var body: some View {
         Group {
@@ -22,6 +22,14 @@ struct BottomSheetContent: View {
         }
         .padding(AppConstants.Layout.standardPadding)
         .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.tripUIState)
+        .presentationBackground(sheetBackground)
+        .fullScreenCover(isPresented: $viewModel.showSettings) {
+            SettingsView(viewModel: viewModel)
+        }
+    }
+
+    private var sheetBackground: AnyShapeStyle {
+        AnyShapeStyle(Color(UIColor.systemBackground))
     }
 
     // MARK: - Initial State
@@ -32,12 +40,23 @@ struct BottomSheetContent: View {
                 searchBar
                     .padding(.bottom, 20)
 
+                // (DESACTIVADO) Filtro de ruta de paraderos
+//                if viewModel.selectedRoute != nil {
+//                    routeFilterBar
+//                        .padding(.bottom, 16)
+//                }
+
+                if !viewModel.searchSuggestions.isEmpty {
+                    searchSuggestionsList
+                        .padding(.bottom, 16)
+                }
+
                 if !viewModel.savedFavorites.isEmpty {
                     favoritesSection
                         .padding(.bottom, 16)
                 }
 
-                settingsIcon
+                settingsButton
             }
         }
     }
@@ -46,21 +65,127 @@ struct BottomSheetContent: View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.secondary)
-            TextField("Buscar destino…", text: $viewModel.searchText)
+            TextField("Buscar lugar…", text: $viewModel.searchText)
                 .font(.body)
                 .submitLabel(.search)
+                .onSubmit {
+                    Task { await viewModel.performLocalSearch() }
+                }
             if !viewModel.searchText.isEmpty {
-                Button(action: { viewModel.searchText = "" }) {
+                Button(action: { viewModel.searchText = ""; viewModel.searchResults = [] }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundColor(.secondary)
                 }
             }
         }
         .padding(12)
-        .background(Color(UIColor.tertiarySystemFill))
-        .cornerRadius(12)
+        .themeCard(cornerRadius: 12)
         .fixedSize(horizontal: false, vertical: true)
     }
+
+    private var searchSuggestionsList: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(viewModel.searchSuggestions) { suggestion in
+                switch suggestion {
+                // (DESACTIVADO) Sugerencias de rutas de paraderos
+//                case .route(let name):
+//                    Button(action: { viewModel.selectRoute(name) }) {
+//                        ...
+//                    }
+//                    .buttonStyle(.plain)
+//
+//                case .stop(let stop):
+//                    Button(action: { viewModel.selectStop(stop) }) {
+//                        ...
+//                    }
+//                    .buttonStyle(.plain)
+
+                case .place(let place):
+                    Button(action: { viewModel.selectPlace(place) }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(place.name)
+                                    .font(.subheadline)
+                                    .foregroundColor(AppConstants.Colors.primaryText)
+                                    .lineLimit(1)
+                                Text(place.subtitle)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "location.circle")
+                                .font(.caption)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                    }
+                    .buttonStyle(.plain)
+
+                case .favorite(let dest):
+                    Button(action: { viewModel.selectFavorite(dest) }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: dest.icon ?? "heart.fill")
+                                .font(.caption)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
+                                .frame(width: 24)
+                            Text(dest.name ?? "Favorito")
+                                .font(.subheadline)
+                                .foregroundColor(AppConstants.Colors.primaryText)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "location.circle")
+                                .font(.caption)
+                                .foregroundColor(AppConstants.Colors.primaryAccent)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if suggestion.id != viewModel.searchSuggestions.last?.id {
+                    Divider()
+                        .padding(.leading, 44)
+                }
+            }
+        }
+        .themeCard(cornerRadius: 12)
+    }
+
+    // (DESACTIVADO) Barra de filtro de ruta de paraderos
+//    private var routeFilterBar: some View {
+//        HStack(spacing: 8) {
+//            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+//                .foregroundColor(AppConstants.Colors.primaryAccent)
+//            Text(viewModel.selectedRoute ?? "")
+//                .font(.subheadline)
+//                .fontWeight(.semibold)
+//                .lineLimit(1)
+//            Spacer()
+//            Text("\(viewModel.filteredBusStops.count) paradas")
+//                .font(.caption)
+//                .foregroundColor(.secondary)
+//            Button(action: { viewModel.clearRouteFilter() }) {
+//                Image(systemName: "xmark.circle.fill")
+//                    .foregroundColor(.secondary)
+//                    .font(.title3)
+//            }
+//            .buttonStyle(.hapticLight)
+//        }
+//        .padding(12)
+//        .background(Color(UIColor.secondarySystemBackground))
+//        .cornerRadius(12)
+//        .overlay(
+//            RoundedRectangle(cornerRadius: 12)
+//                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+//        )
+//    }
 
     private var favoritesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -75,7 +200,7 @@ struct BottomSheetContent: View {
                         VStack(spacing: 6) {
                             ZStack {
                                 Circle()
-                                    .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
+                                    .fill(AppConstants.Colors.primaryAccent.opacity(0.12))
                                     .frame(width: 52, height: 52)
                                 Image(systemName: fav.icon ?? "heart.fill")
                                     .font(.title3)
@@ -96,15 +221,33 @@ struct BottomSheetContent: View {
         }
     }
 
-    private var settingsIcon: some View {
-        Button(action: onOpenSettings) {
-            Image(systemName: "gearshape.fill")
-                .font(.title3)
-                .foregroundColor(AppConstants.Colors.secondaryText)
+    private var settingsButton: some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            viewModel.showSettings = true
+        }) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppConstants.Colors.primaryAccent)
+                }
+                Text("Configuración")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(AppConstants.Colors.primaryText)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(12)
+            .themeCard(cornerRadius: 12)
         }
         .buttonStyle(.hapticLight)
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.vertical, 8)
     }
 
     // MARK: - Configuring State
@@ -114,8 +257,9 @@ struct BottomSheetContent: View {
             VStack(spacing: 16) {
                 HStack(spacing: 8) {
                     cancelPinButton
+                    Spacer()
                     destinationNameField
-                    Spacer(minLength: 4)
+                    Spacer()
                     starMenu
                 }
 
@@ -150,6 +294,7 @@ struct BottomSheetContent: View {
                 .disabled(viewModel.selectedDestination == nil || viewModel.isLoadingETA)
             }
         }
+        .onAppear { isSaved = viewModel.isCurrentDestinationFavorite() }
     }
 
     private var cancelPinButton: some View {
@@ -158,30 +303,107 @@ struct BottomSheetContent: View {
                 .font(.title3)
                 .foregroundColor(.secondary)
                 .frame(width: 36, height: 36)
-                .background(Color(UIColor.tertiarySystemFill))
-                .cornerRadius(10)
+                .themeCard(cornerRadius: 10)
         }
         .buttonStyle(.hapticLight)
     }
 
     private var starMenu: some View {
         Menu {
-            if viewModel.isCurrentDestinationFavorite() {
-                Button(role: .destructive, action: { viewModel.removeFavorite() }) {
+            if isSaved {
+                Button(role: .destructive, action: {
+                    viewModel.removeFavorite()
+                    isSaved = false
+                }) {
                     Label("Eliminar favorito", systemImage: "trash")
                 }
             }
-            Button(action: { viewModel.saveFavorite(icon: "house.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "house.fill")
+                isSaved = true
+            }) {
                 Label("Casa", systemImage: "house.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "briefcase.fill") }) {
+            Button(action: {
+                viewModel.saveFavorite(icon: "briefcase.fill")
+                isSaved = true
+            }) {
                 Label("Trabajo", systemImage: "briefcase.fill")
             }
-            Button(action: { viewModel.saveFavorite(icon: "mappin.and.ellipse") }) {
-                Label("Pin de mapa", systemImage: "mappin.and.ellipse")
+            Button(action: {
+                viewModel.saveFavorite(icon: "heart.fill")
+                isSaved = true
+            }) {
+                Label("Corazón", systemImage: "heart.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "star.fill")
+                isSaved = true
+            }) {
+                Label("Estrella", systemImage: "star.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "flag.fill")
+                isSaved = true
+            }) {
+                Label("Bandera", systemImage: "flag.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "location.fill")
+                isSaved = true
+            }) {
+                Label("Ubicación", systemImage: "location.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "building.fill")
+                isSaved = true
+            }) {
+                Label("Edificio", systemImage: "building.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "bag.fill")
+                isSaved = true
+            }) {
+                Label("Bolsa", systemImage: "bag.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "cart.fill")
+                isSaved = true
+            }) {
+                Label("Carrito", systemImage: "cart.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "cross.fill")
+                isSaved = true
+            }) {
+                Label("Médico", systemImage: "cross.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "book.fill")
+                isSaved = true
+            }) {
+                Label("Libro", systemImage: "book.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "clock.fill")
+                isSaved = true
+            }) {
+                Label("Reloj", systemImage: "clock.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "sun.max.fill")
+                isSaved = true
+            }) {
+                Label("Sol", systemImage: "sun.max.fill")
+            }
+            Button(action: {
+                viewModel.saveFavorite(icon: "moon.fill")
+                isSaved = true
+            }) {
+                Label("Luna", systemImage: "moon.fill")
             }
         } label: {
-            Image(systemName: viewModel.isCurrentDestinationFavorite() ? "star.fill" : "star")
+            Image(systemName: isSaved ? "star.fill" : "star")
                 .font(.title3)
                 .foregroundColor(AppConstants.Colors.primaryAccent)
                 .frame(width: 36, height: 36)
@@ -208,8 +430,7 @@ struct BottomSheetContent: View {
             }
         }
         .padding(12)
-        .background(Color(UIColor.tertiarySystemFill))
-        .cornerRadius(10)
+        .themeCard(cornerRadius: 10)
     }
 
     // MARK: - Active State

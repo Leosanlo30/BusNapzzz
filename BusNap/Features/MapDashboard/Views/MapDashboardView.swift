@@ -4,7 +4,6 @@ import SwiftUI
 struct MapDashboardView: View {
 
     @Bindable var viewModel: MapDashboardViewModel
-    @State private var showSettings = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -18,8 +17,7 @@ struct MapDashboardView: View {
         .ignoresSafeArea(.container, edges: .bottom)
         .sheet(isPresented: $viewModel.showSheet) {
             BottomSheetContent(
-                viewModel: viewModel,
-                onOpenSettings: openSettings
+                viewModel: viewModel
             )
             .presentationDetents(
                 viewModel.currentDetents,
@@ -28,30 +26,6 @@ struct MapDashboardView: View {
             .presentationDragIndicator(.visible)
             .interactiveDismissDisabled(true)
             .presentationBackgroundInteraction(.enabled(upThrough: .large))
-            .presentationBackground(sheetBackground)
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(viewModel: viewModel)
-                .onDisappear {
-                    viewModel.showSheet = true
-                }
-        }
-    }
-
-    private var sheetBackground: AnyShapeStyle {
-        switch viewModel.selectedTheme {
-        case .liquidGlass:
-            AnyShapeStyle(Material.ultraThinMaterial)
-        default:
-            AnyShapeStyle(Color(UIColor.systemBackground))
-        }
-    }
-
-    private func openSettings() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        viewModel.showSheet = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            showSettings = true
         }
     }
 

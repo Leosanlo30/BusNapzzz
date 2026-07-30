@@ -29,7 +29,7 @@ class AudioManager {
         }
     }
     
-    func playAlarm() {
+    func playAlarm(soundName: String = "alarm") {
         stopAlarm()
         
         do {
@@ -37,7 +37,7 @@ class AudioManager {
             } catch {
                 print("Aviso: No se pudo reactivar la sesión de audio.")
             }
-        guard let url = Bundle.main.url(forResource: "alarm", withExtension: "mp3") else {
+        guard let url = Bundle.main.url(forResource: soundName, withExtension: "mp3") else {
             print(" No se encontró el archivo de sonido.")
             return
         }

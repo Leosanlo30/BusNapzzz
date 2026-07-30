@@ -8,10 +8,8 @@ struct Ringtone: Identifiable, Hashable {
 
 let ringtones: [Ringtone] = [
     Ringtone(name: "Alarm", filename: "alarm"),
-    Ringtone(name: "Busy Bee", filename: "busy_bee"),
-    Ringtone(name: "Chime", filename: "chime"),
-    Ringtone(name: "Gentle Wake", filename: "gentle_wake"),
-    Ringtone(name: "Marimba", filename: "marimba"),
+    Ringtone(name: "Alarm 2", filename: "alarm2"),
+    Ringtone(name: "Alarm 3", filename: "alarm3"),
 ]
 
 struct SettingsView: View {
@@ -24,7 +22,6 @@ struct SettingsView: View {
                 customTimeSection
                 vibrationSection
                 ringtoneSection
-                themeSection
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Configuración")
@@ -104,7 +101,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Tono")
                             .font(.subheadline)
-                        Text(viewModel.ringtoneName)
+                        Text(ringtones.first(where: { $0.filename == viewModel.ringtoneName })?.name ?? viewModel.ringtoneName)
                             .font(.caption)
                             .foregroundColor(AppConstants.Colors.secondaryText)
                     }
@@ -114,44 +111,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Themes
-
-    private var themeSection: some View {
-        Section("Tema") {
-            ForEach(AppTheme.allCases, id: \.self) { theme in
-                Button(action: { viewModel.updateTheme(theme) }) {
-                    HStack {
-                        Image(systemName: "paintbrush.fill")
-                            .foregroundColor(AppConstants.Colors.primaryAccent)
-                            .frame(width: 28)
-
-                        Text(theme.displayName)
-                            .font(.subheadline)
-                            .foregroundColor(AppConstants.Colors.primaryText)
-
-                        Spacer()
-
-                        if theme == viewModel.selectedTheme {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(AppConstants.Colors.primaryAccent)
-                                .font(.subheadline)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-
-            if viewModel.selectedTheme == .liquidGlass {
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(AppConstants.Colors.secondaryText)
-                    Text("Los paneles se vuelven translúcidos para mostrar el mapa detrás.")
-                        .font(.caption)
-                        .foregroundColor(AppConstants.Colors.secondaryText)
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Ringtone Picker
@@ -163,7 +122,7 @@ struct RingtonePickerView: View {
     var body: some View {
         List(ringtones) { tone in
             Button(action: {
-                selectedRingtone = tone.name
+                selectedRingtone = tone.filename
                 dismiss()
             }) {
                 HStack {
@@ -173,7 +132,7 @@ struct RingtonePickerView: View {
                         .font(.subheadline)
                         .foregroundColor(AppConstants.Colors.primaryText)
                     Spacer()
-                    if tone.name == selectedRingtone {
+                    if tone.filename == selectedRingtone {
                         Image(systemName: "checkmark")
                             .foregroundColor(AppConstants.Colors.primaryAccent)
                     }
