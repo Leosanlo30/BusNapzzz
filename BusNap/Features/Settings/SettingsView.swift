@@ -14,11 +14,13 @@ let ringtones: [Ringtone] = [
 
 struct SettingsView: View {
     @Bindable var viewModel: MapDashboardViewModel
+    @Environment(ThemeManager.self) private var theme
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Form {
+                appearanceSection
                 customTimeSection
                 vibrationSection
                 ringtoneSection
@@ -30,6 +32,24 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Listo") { dismiss() }
                         .buttonStyle(.hapticLight)
+                }
+            }
+        }
+    }
+
+    // MARK: - Appearance
+
+    private var appearanceSection: some View {
+        Section("Apariencia") {
+            Picker("Tema", selection: Binding(
+                get: { theme.mode },
+                set: { newValue in
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    theme.mode = newValue
+                }
+            )) {
+                ForEach(AppThemeMode.allCases) { mode in
+                    Label(mode.label, systemImage: mode.icon).tag(mode)
                 }
             }
         }

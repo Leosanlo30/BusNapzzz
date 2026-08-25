@@ -1,7 +1,14 @@
 import SwiftUI
 
+/// Apple Maps-inspired bottom sheet.
+///
+/// Architecture note: this view observes the shared `MapDashboardViewModel`,
+/// but the underlying `DestinationMapView` only reads map-specific
+/// properties (`selectedDestination`, `leadTime`), so sheet state changes
+/// (Initial → Configuring → Active…) never invalidate or redraw the Map layer.
 struct BottomSheetContent: View {
     @Bindable var viewModel: MapDashboardViewModel
+    @Environment(ThemeManager.self) private var theme
     @FocusState private var isNameFocused: Bool
     @State private var isSaved = false
 
@@ -21,7 +28,7 @@ struct BottomSheetContent: View {
             }
         }
         .padding(AppConstants.Layout.standardPadding)
-        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: viewModel.tripUIState)
+        .animation(.busnapSpring, value: viewModel.tripUIState)
         .presentationBackground(sheetBackground)
         .fullScreenCover(isPresented: $viewModel.showSettings) {
             SettingsView(viewModel: viewModel)
@@ -29,7 +36,10 @@ struct BottomSheetContent: View {
     }
 
     private var sheetBackground: AnyShapeStyle {
-        AnyShapeStyle(Color(UIColor.systemBackground))
+        switch theme.mode {
+        case .liquidGlass: AnyShapeStyle(.ultraThinMaterial)
+        case .light, .dark: AnyShapeStyle(Color(UIColor.systemBackground))
+        }
     }
 
     // MARK: - Initial State
@@ -40,15 +50,10 @@ struct BottomSheetContent: View {
                 searchBar
                     .padding(.bottom, 20)
 
-                // (DESACTIVADO) Filtro de ruta de paraderos
-//                if viewModel.selectedRoute != nil {
-//                    routeFilterBar
-//                        .padding(.bottom, 16)
-//                }
-
                 if !viewModel.searchSuggestions.isEmpty {
                     searchSuggestionsList
                         .padding(.bottom, 16)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
                 if !viewModel.savedFavorites.isEmpty {
@@ -56,97 +61,67 @@ struct BottomSheetContent: View {
                         .padding(.bottom, 16)
                 }
 
-                settingsButton
+                settingsRow
             }
         }
+        .animation(.busnapSpring, value: viewModel.searchSuggestions.isEmpty)
     }
 
+    /// Apple Maps-style search pill — glass surface, hierarchical icon,
+    /// clear inner container so the map blur passes through.
     private var searchBar: some View {
-        HStack {
+        HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
-            TextField("Buscar lugar…", text: $viewModel.searchText)
+                .font(.body.weight(.semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.secondary)
+
+            TextField("Buscar lugar…", text: $viewModel.searchText, axis: .vertical)
                 .font(.body)
                 .submitLabel(.search)
                 .onSubmit {
                     Task { await viewModel.performLocalSearch() }
                 }
+
             if !viewModel.searchText.isEmpty {
                 Button(action: { viewModel.searchText = ""; viewModel.searchResults = [] }) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
                 }
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .padding(12)
-        .themeCard(cornerRadius: 12)
-        .fixedSize(horizontal: false, vertical: true)
+        .innerClearContainer(cornerRadius: 14)
+        .themeCard(cornerRadius: 14)
+        .animation(.busnapSnap, value: viewModel.searchText.isEmpty)
     }
 
     private var searchSuggestionsList: some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(viewModel.searchSuggestions) { suggestion in
                 switch suggestion {
-                // (DESACTIVADO) Sugerencias de rutas de paraderos
-//                case .route(let name):
-//                    Button(action: { viewModel.selectRoute(name) }) {
-//                        ...
-//                    }
-//                    .buttonStyle(.plain)
-//
-//                case .stop(let stop):
-//                    Button(action: { viewModel.selectStop(stop) }) {
-//                        ...
-//                    }
-//                    .buttonStyle(.plain)
-
                 case .place(let place):
                     Button(action: { viewModel.selectPlace(place) }) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(AppConstants.Colors.primaryAccent)
-                                .frame(width: 24)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(place.name)
-                                    .font(.subheadline)
-                                    .foregroundColor(AppConstants.Colors.primaryText)
-                                    .lineLimit(1)
-                                Text(place.subtitle)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                            }
-                            Spacer()
-                            Image(systemName: "location.circle")
-                                .font(.caption)
-                                .foregroundColor(AppConstants.Colors.primaryAccent)
-                        }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
+                        suggestionRow(
+                            icon: "mappin.circle.fill",
+                            title: place.name,
+                            subtitle: place.subtitle
+                        )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hapticLight)
 
                 case .favorite(let dest):
                     Button(action: { viewModel.selectFavorite(dest) }) {
-                        HStack(spacing: 10) {
-                            Image(systemName: dest.icon ?? "heart.fill")
-                                .font(.caption)
-                                .foregroundColor(AppConstants.Colors.primaryAccent)
-                                .frame(width: 24)
-                            Text(dest.name ?? "Favorito")
-                                .font(.subheadline)
-                                .foregroundColor(AppConstants.Colors.primaryText)
-                                .lineLimit(1)
-                            Spacer()
-                            Image(systemName: "location.circle")
-                                .font(.caption)
-                                .foregroundColor(AppConstants.Colors.primaryAccent)
-                        }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
+                        suggestionRow(
+                            icon: dest.icon ?? "heart.fill",
+                            title: dest.name ?? "Favorito",
+                            subtitle: nil,
+                            tint: AppConstants.Colors.primaryAccent
+                        )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.hapticLight)
                 }
 
                 if suggestion.id != viewModel.searchSuggestions.last?.id {
@@ -155,61 +130,77 @@ struct BottomSheetContent: View {
                 }
             }
         }
-        .themeCard(cornerRadius: 12)
+        .padding(.vertical, 4)
+        .themeCard(cornerRadius: 14)
     }
 
-    // (DESACTIVADO) Barra de filtro de ruta de paraderos
-//    private var routeFilterBar: some View {
-//        HStack(spacing: 8) {
-//            Image(systemName: "line.3.horizontal.decrease.circle.fill")
-//                .foregroundColor(AppConstants.Colors.primaryAccent)
-//            Text(viewModel.selectedRoute ?? "")
-//                .font(.subheadline)
-//                .fontWeight(.semibold)
-//                .lineLimit(1)
-//            Spacer()
-//            Text("\(viewModel.filteredBusStops.count) paradas")
-//                .font(.caption)
-//                .foregroundColor(.secondary)
-//            Button(action: { viewModel.clearRouteFilter() }) {
-//                Image(systemName: "xmark.circle.fill")
-//                    .foregroundColor(.secondary)
-//                    .font(.title3)
-//            }
-//            .buttonStyle(.hapticLight)
-//        }
-//        .padding(12)
-//        .background(Color(UIColor.secondarySystemBackground))
-//        .cornerRadius(12)
-//        .overlay(
-//            RoundedRectangle(cornerRadius: 12)
-//                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-//        )
-//    }
+    private func suggestionRow(
+        icon: String,
+        title: String,
+        subtitle: String?,
+        tint: Color = AppConstants.Colors.primaryAccent
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .symbolRenderingMode(.multicolor)
+                .foregroundStyle(tint)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            Image(systemName: "arrow.up.left")
+                .font(.caption.weight(.semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .contentShape(Rectangle())
+    }
 
     private var favoritesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Favoritos")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(AppConstants.Colors.secondaryText)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 16) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 16) {
                 ForEach(viewModel.savedFavorites, id: \.self) { fav in
                     Button(action: { viewModel.selectFavorite(fav) }) {
                         VStack(spacing: 6) {
+                            // Clear inner circle in Liquid Glass: the sheet's
+                            // ultraThinMaterial blurs the map through it.
                             ZStack {
                                 Circle()
-                                    .fill(AppConstants.Colors.primaryAccent.opacity(0.12))
-                                    .frame(width: 52, height: 52)
+                                    .fill(theme.mode == .liquidGlass ? Color.clear : AppConstants.Colors.primaryAccent.opacity(0.12))
+                                if theme.mode == .liquidGlass {
+                                    Circle()
+                                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                                }
                                 Image(systemName: fav.icon ?? "heart.fill")
                                     .font(.title3)
-                                    .foregroundColor(AppConstants.Colors.primaryAccent)
+                                    .symbolRenderingMode(.multicolor)
                             }
+                            .frame(width: 52, height: 52)
                             Text(fav.name ?? "Favorito")
                                 .font(.caption2)
                                 .fontWeight(.medium)
-                                .foregroundColor(AppConstants.Colors.primaryText)
+                                .foregroundStyle(.primary)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                         }
@@ -221,7 +212,7 @@ struct BottomSheetContent: View {
         }
     }
 
-    private var settingsButton: some View {
+    private var settingsRow: some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             viewModel.showSettings = true
@@ -229,23 +220,29 @@ struct BottomSheetContent: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(AppConstants.Colors.primaryAccent.opacity(0.15))
-                        .frame(width: 44, height: 44)
+                        .fill(AppConstants.Colors.primaryAccent.opacity(theme.mode == .liquidGlass ? 0 : 0.15))
+                        .frame(width: 36, height: 36)
+                    if theme.mode == .liquidGlass {
+                        Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                            .frame(width: 36, height: 36)
+                    }
                     Image(systemName: "gearshape.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(AppConstants.Colors.primaryAccent)
+                        .font(.system(size: 17))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(AppConstants.Colors.primaryAccent)
                 }
                 Text("Configuración")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(AppConstants.Colors.primaryText)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.caption.weight(.semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.tertiary)
             }
             .padding(12)
-            .themeCard(cornerRadius: 12)
+            .themeCard(cornerRadius: 14)
         }
         .buttonStyle(.hapticLight)
     }
@@ -257,41 +254,32 @@ struct BottomSheetContent: View {
             VStack(spacing: 16) {
                 HStack(spacing: 8) {
                     cancelPinButton
-                    Spacer()
                     destinationNameField
-                    Spacer()
                     starMenu
                 }
 
                 if viewModel.isLoadingETA {
-                    HStack {
+                    HStack(spacing: 8) {
                         ProgressView()
-                            .padding(.trailing, 8)
                         Text("Calculando ruta…")
-                            .foregroundColor(AppConstants.Colors.secondaryText)
-                        Spacer()
-                    }
-                } else if let eta = viewModel.simulatedETA {
-                    HStack {
-                        Image(systemName: "clock.fill")
-                            .foregroundColor(AppConstants.Colors.success)
-                        let minutes = max(1, Int(ceil(eta / 60)))
-                        Text("Tiempo de ruta: \(minutes) min")
-                            .fontWeight(.semibold)
-                            .foregroundColor(minutes <= viewModel.leadTime.minutes ? AppConstants.Colors.destructive : AppConstants.Colors.primaryText)
+                            .foregroundStyle(.secondary)
                         Spacer()
                     }
                     .transition(.move(edge: .top).combined(with: .opacity))
+                } else if let eta = viewModel.simulatedETA {
+                    etaBanner(minutes: max(1, Int(ceil(eta / 60))), label: "Tiempo de ruta")
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
                 LeadTimePickerView(viewModel: viewModel)
 
-                PrimaryButton(title: "Iniciar Viaje", icon: "arrow.triangle.turn.up.right.circle.fill") {
+                PrimaryButton(title: "Iniciar Viaje", icon: "location.north.circle.fill") {
                     viewModel.confirmDestinationName()
                     viewModel.activateTrip()
                 }
                 .opacity(viewModel.selectedDestination == nil || viewModel.isLoadingETA ? 0.5 : 1.0)
                 .disabled(viewModel.selectedDestination == nil || viewModel.isLoadingETA)
+                .animation(.busnapSpring, value: viewModel.isLoadingETA)
             }
         }
         .onAppear { isSaved = viewModel.isCurrentDestinationFavorite() }
@@ -300,123 +288,19 @@ struct BottomSheetContent: View {
     private var cancelPinButton: some View {
         Button(action: { viewModel.clearDestination() }) {
             Image(systemName: "xmark.circle.fill")
-                .font(.title3)
-                .foregroundColor(.secondary)
-                .frame(width: 36, height: 36)
-                .themeCard(cornerRadius: 10)
-        }
-        .buttonStyle(.hapticLight)
-    }
-
-    private var starMenu: some View {
-        Menu {
-            if isSaved {
-                Button(role: .destructive, action: {
-                    viewModel.removeFavorite()
-                    isSaved = false
-                }) {
-                    Label("Eliminar favorito", systemImage: "trash")
-                }
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "house.fill")
-                isSaved = true
-            }) {
-                Label("Casa", systemImage: "house.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "briefcase.fill")
-                isSaved = true
-            }) {
-                Label("Trabajo", systemImage: "briefcase.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "heart.fill")
-                isSaved = true
-            }) {
-                Label("Corazón", systemImage: "heart.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "star.fill")
-                isSaved = true
-            }) {
-                Label("Estrella", systemImage: "star.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "flag.fill")
-                isSaved = true
-            }) {
-                Label("Bandera", systemImage: "flag.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "location.fill")
-                isSaved = true
-            }) {
-                Label("Ubicación", systemImage: "location.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "building.fill")
-                isSaved = true
-            }) {
-                Label("Edificio", systemImage: "building.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "bag.fill")
-                isSaved = true
-            }) {
-                Label("Bolsa", systemImage: "bag.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "cart.fill")
-                isSaved = true
-            }) {
-                Label("Carrito", systemImage: "cart.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "cross.fill")
-                isSaved = true
-            }) {
-                Label("Médico", systemImage: "cross.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "book.fill")
-                isSaved = true
-            }) {
-                Label("Libro", systemImage: "book.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "clock.fill")
-                isSaved = true
-            }) {
-                Label("Reloj", systemImage: "clock.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "sun.max.fill")
-                isSaved = true
-            }) {
-                Label("Sol", systemImage: "sun.max.fill")
-            }
-            Button(action: {
-                viewModel.saveFavorite(icon: "moon.fill")
-                isSaved = true
-            }) {
-                Label("Luna", systemImage: "moon.fill")
-            }
-        } label: {
-            Image(systemName: isSaved ? "star.fill" : "star")
-                .font(.title3)
-                .foregroundColor(AppConstants.Colors.primaryAccent)
-                .frame(width: 36, height: 36)
-                .background(AppConstants.Colors.primaryAccent.opacity(0.12))
-                .cornerRadius(10)
+                .font(.title2)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.secondary)
+                .floatingMapControl()
         }
         .buttonStyle(.hapticLight)
     }
 
     private var destinationNameField: some View {
-        HStack {
+        HStack(spacing: 10) {
             Image(systemName: "mappin.and.ellipse")
-                .foregroundColor(AppConstants.Colors.primaryAccent)
+                .symbolRenderingMode(.multicolor)
+                .foregroundStyle(AppConstants.Colors.primaryAccent)
             TextField("Nombre del destino", text: $viewModel.destinationName)
                 .fontWeight(.medium)
                 .focused($isNameFocused)
@@ -425,15 +309,61 @@ struct BottomSheetContent: View {
             if !viewModel.destinationName.isEmpty {
                 Button(action: { viewModel.destinationName = "" }) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .padding(12)
-        .themeCard(cornerRadius: 10)
+        .innerClearContainer(cornerRadius: 14)
+        .themeCard(cornerRadius: 14)
+        .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Active State
+    private var starMenu: some View {
+        Menu {
+            favoriteAction("Casa", icon: "house.fill")
+            favoriteAction("Trabajo", icon: "briefcase.fill")
+            favoriteAction("Corazón", icon: "heart.fill")
+            favoriteAction("Estrella", icon: "star.fill")
+            favoriteAction("Bandera", icon: "flag.fill")
+            favoriteAction("Ubicación", icon: "location.fill")
+            favoriteAction("Edificio", icon: "building.fill")
+            favoriteAction("Bolsa", icon: "bag.fill")
+            favoriteAction("Carrito", icon: "cart.fill")
+            favoriteAction("Médico", icon: "cross.fill")
+            favoriteAction("Libro", icon: "book.fill")
+            favoriteAction("Reloj", icon: "clock.fill")
+            favoriteAction("Sol", icon: "sun.max.fill")
+            favoriteAction("Luna", icon: "moon.fill")
+            if isSaved {
+                Button(role: .destructive, action: {
+                    viewModel.removeFavorite()
+                    isSaved = false
+                }) {
+                    Label("Eliminar favorito", systemImage: "trash")
+                }
+            }
+        } label: {
+            Image(systemName: isSaved ? "star.fill" : "star")
+                .font(.title3)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(isSaved ? .yellow : AppConstants.Colors.primaryAccent)
+                .floatingMapControl()
+        }
+        .animation(.busnapSnap, value: isSaved)
+    }
+
+    private func favoriteAction(_ label: String, icon: String) -> some View {
+        Button(action: {
+            viewModel.saveFavorite(icon: icon)
+            isSaved = true
+        }) {
+            Label(label, systemImage: icon)
+        }
+    }
+
+    // MARK: - Active / Paused States
 
     private var activeState: some View {
         VStack(spacing: 16) {
@@ -442,34 +372,14 @@ struct BottomSheetContent: View {
 
             HStack(spacing: 12) {
                 Button(action: { viewModel.pauseTrip() }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "pause.circle.fill")
-                            .font(.title3)
-                        Text("Pausar")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: AppConstants.Layout.buttonHeight)
-                    .background(AppConstants.Colors.primaryAccent)
-                    .foregroundColor(.white)
-                    .cornerRadius(AppConstants.Layout.cornerRadius)
+                    controlLabel(icon: "pause.circle.fill", title: "Pausar", tint: AppConstants.Colors.primaryAccent)
                 }
                 .buttonStyle(.hapticMedium)
 
-                Button(action: { viewModel.cancelTrip() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(AppConstants.Colors.destructive)
-                        .frame(width: AppConstants.Layout.buttonHeight, height: AppConstants.Layout.buttonHeight)
-                        .background(AppConstants.Colors.destructive.opacity(0.1))
-                        .cornerRadius(AppConstants.Layout.cornerRadius)
-                }
-                .buttonStyle(.hapticHeavy)
+                cancelButton
             }
         }
     }
-
-    // MARK: - Paused State
 
     private var pausedState: some View {
         VStack(spacing: 16) {
@@ -478,31 +388,43 @@ struct BottomSheetContent: View {
 
             HStack(spacing: 12) {
                 Button(action: { viewModel.resumeTrip() }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "play.circle.fill")
-                            .font(.title3)
-                        Text("Reanudar")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: AppConstants.Layout.buttonHeight)
-                    .background(AppConstants.Colors.success)
-                    .foregroundColor(.white)
-                    .cornerRadius(AppConstants.Layout.cornerRadius)
+                    controlLabel(icon: "play.circle.fill", title: "Reanudar", tint: AppConstants.Colors.success)
                 }
                 .buttonStyle(.hapticMedium)
 
-                Button(action: { viewModel.cancelTrip() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(AppConstants.Colors.destructive)
-                        .frame(width: AppConstants.Layout.buttonHeight, height: AppConstants.Layout.buttonHeight)
-                        .background(AppConstants.Colors.destructive.opacity(0.1))
-                        .cornerRadius(AppConstants.Layout.cornerRadius)
-                }
-                .buttonStyle(.hapticHeavy)
+                cancelButton
             }
         }
+    }
+
+    private func controlLabel(icon: String, title: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .symbolRenderingMode(.multicolor)
+            Text(title)
+                .fontWeight(.semibold)
+        }
+        .foregroundColor(.white)
+        .frame(maxWidth: .infinity)
+        .frame(height: AppConstants.Layout.buttonHeight)
+        .background(tint, in: RoundedRectangle(cornerRadius: AppConstants.Layout.cornerRadius, style: .continuous))
+        .shadow(color: tint.opacity(0.35), radius: 10, x: 0, y: 5)
+    }
+
+    private var cancelButton: some View {
+        Button(action: { viewModel.cancelTrip() }) {
+            Image(systemName: "xmark")
+                .font(.title3.weight(.semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(AppConstants.Colors.destructive)
+                .frame(width: AppConstants.Layout.buttonHeight, height: AppConstants.Layout.buttonHeight)
+                .background(
+                    AppConstants.Colors.destructive.opacity(theme.mode == .dark ? 0.18 : 0.1),
+                    in: RoundedRectangle(cornerRadius: AppConstants.Layout.cornerRadius, style: .continuous)
+                )
+        }
+        .buttonStyle(.hapticHeavy)
     }
 
     // MARK: - Finished State
@@ -511,7 +433,7 @@ struct BottomSheetContent: View {
         VStack(spacing: 20) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
-                .foregroundColor(AppConstants.Colors.success)
+                .symbolRenderingMode(.multicolor)
                 .transition(.scale.combined(with: .opacity))
 
             VStack(spacing: 4) {
@@ -520,13 +442,14 @@ struct BottomSheetContent: View {
                     .fontWeight(.bold)
                 Text("Es hora de bajar del autobús.")
                     .font(.subheadline)
-                    .foregroundColor(AppConstants.Colors.secondaryText)
+                    .foregroundStyle(.secondary)
             }
 
             Button(action: { viewModel.dismissFinished() }) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.title)
-                    .foregroundColor(AppConstants.Colors.secondaryText)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.hapticLight)
         }
@@ -537,36 +460,45 @@ struct BottomSheetContent: View {
     // MARK: - Shared Components
 
     private var destinationInfo: some View {
-        HStack {
+        HStack(spacing: 10) {
             Image(systemName: "mappin.and.ellipse")
-                .foregroundColor(AppConstants.Colors.primaryAccent)
+                .symbolRenderingMode(.multicolor)
+                .foregroundStyle(AppConstants.Colors.primaryAccent)
             Text(viewModel.selectedDestination?.name ?? "Destino")
-                .fontWeight(.medium)
+                .fontWeight(.semibold)
+                .lineLimit(1)
             Spacer()
         }
+        .padding(14)
+        .themeCard(cornerRadius: 14)
     }
 
     private var routeTimeRow: some View {
         Group {
             if viewModel.isLoadingETA {
-                HStack {
+                HStack(spacing: 8) {
                     ProgressView()
-                        .padding(.trailing, 8)
                     Text("Actualizando ruta…")
-                        .foregroundColor(AppConstants.Colors.secondaryText)
+                        .foregroundStyle(.secondary)
                     Spacer()
                 }
             } else if let eta = viewModel.simulatedETA {
-                HStack {
-                    Image(systemName: "clock.fill")
-                        .foregroundColor(AppConstants.Colors.success)
-                    let minutes = max(1, Int(ceil(eta / 60)))
-                    Text("Tiempo de viaje: \(minutes) min")
-                        .fontWeight(.semibold)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
+                etaBanner(minutes: max(1, Int(ceil(eta / 60))), label: "Tiempo de viaje")
             }
         }
+    }
+
+    private func etaBanner(minutes: Int, label: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: minutes <= viewModel.leadTime.minutes ? "exclamationmark.triangle.fill" : "clock.fill")
+                .symbolRenderingMode(.multicolor)
+                .foregroundStyle(minutes <= viewModel.leadTime.minutes ? AppConstants.Colors.destructive : AppConstants.Colors.success)
+            Text("\(label): \(minutes) min")
+                .fontWeight(.semibold)
+                .foregroundStyle(minutes <= viewModel.leadTime.minutes ? AppConstants.Colors.destructive : .primary)
+            Spacer()
+        }
+        .padding(14)
+        .themeCard(cornerRadius: 14)
     }
 }
