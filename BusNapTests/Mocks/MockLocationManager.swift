@@ -32,9 +32,15 @@ final class MockLocationManager: LocationManaging {
     }
     
     func enableEcoMode() {}
-    
+
     func disableEcoMode() {}
-    
+
+    func setDestination(_ coordinate: CLLocationCoordinate2D) {}
+
+    func clearDestination() {}
+
+    var distanceToDestination: CLLocationDistance? = nil
+
     func setLocationHandler(_ handler: @escaping (CLLocation) -> Void) {
         // Mock: no hacemos nada con el handler
     }

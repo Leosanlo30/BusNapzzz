@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct LeadTimePickerView: View {
+    @Environment(ThemeManager.self) private var theme
     var viewModel: MapDashboardViewModel
 
     private var options: [AlertLeadTime] {
@@ -16,7 +17,7 @@ struct LeadTimePickerView: View {
             Text("Avisarme antes de llegar:")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(AppConstants.Colors.secondaryText)
+                .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
                 ForEach(options, id: \.id) { option in
@@ -28,21 +29,21 @@ struct LeadTimePickerView: View {
                         Text(option.displayTitle)
                             .font(.system(size: 14, weight: isSelected ? .bold : .medium))
                             .frame(maxWidth: .infinity, minHeight: 50)
-                            .background(
-                                isSelected
-                                    ? AnyShapeStyle(AppConstants.Colors.primaryAccent)
-                                    : AnyShapeStyle(Color(UIColor.secondarySystemBackground)),
-                                in: RoundedRectangle(cornerRadius: 10)
-                            )
-                            .foregroundColor(isSelected ? .white : .primary)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-                            )
+                            .foregroundStyle(isSelected ? Color.white : Color.primary)
+                            .background {
+                                if isSelected {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(AppConstants.Colors.primaryAccent)
+                                        .shadow(color: AppConstants.Colors.primaryAccent.opacity(0.3), radius: 6, x: 0, y: 3)
+                                } else {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Color.white.opacity(theme.mode == .liquidGlass ? 0.15 : 0), lineWidth: 1)
+                                }
+                            }
+                            .innerClearContainer(cornerRadius: 12)
                     }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity)
-                    .animation(.easeInOut(duration: 0.2), value: isSelected)
+                    .buttonStyle(.hapticLight)
+                    .animation(.busnapSpring, value: isSelected)
                 }
             }
         }
