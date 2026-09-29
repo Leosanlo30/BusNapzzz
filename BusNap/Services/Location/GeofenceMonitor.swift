@@ -5,78 +5,84 @@
 //  Created by Leonardo Ariel San Martin Lopez  on 10/07/26.
 //
 
+import OSLog
 import Foundation
 import CoreLocation
 
-/// Servicio dedicado exclusivamente a la creación y vigilancia de Geocercas (regiones circulares).
+/// Contrato de la vigilancia de geocercas, para poder simular entradas en tests.
 @MainActor
-final class GeofenceMonitor: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
-    
+protocol GeofenceMonitoring: AnyObject {
+    /// Se ejecuta cuando el dispositivo entra en la región. Recibe su identificador.
+    var onRegionEntered: ((String) -> Void)? { get set }
+    func startMonitoring(destination: Destination, radius: CLLocationDistance, identifier: String)
+    func stopMonitoring()
+}
+
+/// Servicio dedicado exclusivamente a la creación y vigilancia de Geocercas (regiones circulares).
+///
+/// Las regiones las vigila el sistema operativo, incluso con la app terminada:
+/// iOS relanza la app en segundo plano al cruzar la frontera.
+@MainActor
+final class GeofenceMonitor: NSObject, GeofenceMonitoring {
+
     private let locationManager = CLLocationManager()
-    
-    /// Closure que se ejecutará cuando el dispositivo cruce el perímetro hacia adentro.
-    /// Envía el identificador de la región (usualmente el nombre del destino).
+
     var onRegionEntered: ((String) -> Void)?
-    
+
     override init() {
         super.init()
         locationManager.delegate = self
     }
-    
+
     /// Inicia el monitoreo de una geocerca circular alrededor del destino.
     /// - Parameters:
-    ///   - destination: El modelo de destino con latitud y longitud.
-    ///   - radius: El radio en metros de la "zona crítica" (default: 1000m).
-    func startMonitoring(destination: Destination, radius: CLLocationDistance = 1000.0) {
-        let coordinate = CLLocationCoordinate2D(latitude: destination.latitude, longitude: destination.longitude)
-        
+    ///   - destination: El destino con latitud y longitud.
+    ///   - radius: El radio en metros de la "zona crítica".
+    ///   - identifier: Identificador estable de la región (el del viaje, no el nombre del destino).
+    func startMonitoring(destination: Destination, radius: CLLocationDistance, identifier: String) {
         guard CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else {
-            print(" GeofenceMonitor: La geocerca no está disponible en este dispositivo.")
+            Log.location.error("Geocercas no disponibles en este dispositivo")
             return
         }
-        
-        guard CLLocationCoordinate2DIsValid(coordinate) else {
-            print(" GeofenceMonitor: Intento de monitorear coordenadas inválidas.")
+
+        guard CLLocationCoordinate2DIsValid(destination.coordinate) else {
+            Log.location.error("Coordenadas inválidas para geocerca")
             return
         }
-        
-        // 2. Generar identificador único (Usamos el nombre o un UUID si no tiene)
-        let regionIdentifier = destination.name ?? UUID().uuidString
-        
-        // 3. Crear la región circular
-        let region = CLCircularRegion(center: coordinate, radius: radius, identifier: regionIdentifier)
-        
-        // 4. Configurar reglas de notificación
+
+        // Solo vigilamos un viaje a la vez: purgamos cualquier región previa.
+        stopMonitoring()
+
+        let clampedRadius = min(radius, locationManager.maximumRegionMonitoringDistance)
+        let region = CLCircularRegion(center: destination.coordinate, radius: clampedRadius, identifier: identifier)
         region.notifyOnEntry = true
-        region.notifyOnExit = false // Para BusNap solo nos importa la llegada
-        
-        // 5. Entregar la tarea al sistema operativo
+        region.notifyOnExit = false
+
         locationManager.startMonitoring(for: region)
-        print("📍 Geocerca activada para: \(regionIdentifier) con \(radius)m de radio.")
+        Log.location.info("Geocerca activada (\(clampedRadius, format: .fixed(precision: 0)) m)")
     }
-    
-    /// Limpia la antena y detiene todas las vigilancias activas.
+
+    /// Detiene y purga todas las regiones vigiladas por la app,
+    /// incluidas las que hayan quedado de sesiones anteriores.
     func stopMonitoring() {
         for region in locationManager.monitoredRegions {
             locationManager.stopMonitoring(for: region)
         }
-        print(" Monitoreo de geocercas detenido y purgado.")
     }
-    
-    // MARK: - CLLocationManagerDelegate
-    
-    // CoreLocation llama a este método cuando cruzamos la frontera de la región.
-    // Usamos 'nonisolated' porque el sistema operativo lo puede llamar desde otro hilo.
+}
+
+// MARK: - CLLocationManagerDelegate
+
+extension GeofenceMonitor: CLLocationManagerDelegate {
+
     nonisolated func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        print(" ¡Cruzamos la geocerca de la región: \(region.identifier)!")
-        
-        // Brincamos al hilo principal para avisarle al motor de forma segura
-        Task { @MainActor in
-            self.onRegionEntered?(region.identifier)
+        let identifier = region.identifier
+        Task { @MainActor [weak self] in
+            self?.onRegionEntered?(identifier)
         }
     }
-    
+
     nonisolated func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error) {
-        print(" Error en geocerca para \(region?.identifier ?? "Desconocido"): \(error.localizedDescription)")
+        Log.location.error("Fallo de geocerca: \(error.localizedDescription, privacy: .public)")
     }
 }

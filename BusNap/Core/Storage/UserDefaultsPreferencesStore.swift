@@ -10,32 +10,42 @@ import Foundation
 struct UserDefaultsPreferencesStore: UserPreferencesStoring {
     private let leadTimeKey = "com.busnap.app.preferences.leadTime"
     private let favoritesKey = "com.busnap.app.preferences.favorites"
+    private let recentsKey = "com.busnap.app.preferences.recents"
 
     func saveLeadTime(_ time: AlertLeadTime) {
-        if let encoded = try? JSONEncoder().encode(time) {
-            UserDefaults.standard.set(encoded, forKey: leadTimeKey)
-        }
+        save(time, forKey: leadTimeKey)
     }
 
     func loadLeadTime() -> AlertLeadTime {
-        if let savedData = UserDefaults.standard.data(forKey: leadTimeKey),
-           let decoded = try? JSONDecoder().decode(AlertLeadTime.self, from: savedData) {
-            return decoded
-        }
-        return .fiveMinutes
+        load(AlertLeadTime.self, forKey: leadTimeKey) ?? .fiveMinutes
     }
 
     func saveFavorites(_ favorites: [Destination]) {
-        if let encoded = try? JSONEncoder().encode(favorites) {
-            UserDefaults.standard.set(encoded, forKey: favoritesKey)
-        }
+        save(favorites, forKey: favoritesKey)
     }
 
     func loadFavorites() -> [Destination] {
-        if let savedData = UserDefaults.standard.data(forKey: favoritesKey),
-           let decoded = try? JSONDecoder().decode([Destination].self, from: savedData) {
-            return decoded
+        load([Destination].self, forKey: favoritesKey) ?? []
+    }
+
+    func saveRecents(_ recents: [Destination]) {
+        save(recents, forKey: recentsKey)
+    }
+
+    func loadRecents() -> [Destination] {
+        load([Destination].self, forKey: recentsKey) ?? []
+    }
+
+    // MARK: - Private
+
+    private func save<T: Encodable>(_ value: T, forKey key: String) {
+        if let encoded = try? JSONEncoder().encode(value) {
+            UserDefaults.standard.set(encoded, forKey: key)
         }
-        return []
+    }
+
+    private func load<T: Decodable>(_ type: T.Type, forKey key: String) -> T? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
     }
 }

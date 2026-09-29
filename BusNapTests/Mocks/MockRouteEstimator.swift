@@ -11,18 +11,24 @@ import CoreLocation
 
 // Nuestro doble de acción. Es Sendable para cumplir con el contrato de concurrencia.
 struct MockRouteEstimator: RouteEstimating {
-    
+
     var shouldFail: Bool = false
     var simulatedTime: TimeInterval = 900
     var simulatedDistance: CLLocationDistance = 5000
-    
+    var delay: Duration = .milliseconds(50)
+    /// Tiempos distintos por nombre de destino, para detectar respuestas cruzadas.
+    var timesByDestinationName: [String: TimeInterval] = [:]
+    /// Retrasos distintos por nombre de destino, para simular carreras.
+    var delaysByDestinationName: [String: Duration] = [:]
+
     func estimateRoute(to destination: Destination, from currentLocation: CLLocation?) async throws -> RouteEstimate {
-        try await Task.sleep(nanoseconds: 500_000_000)
-        
+        try await Task.sleep(for: delaysByDestinationName[destination.name ?? ""] ?? delay)
+
         if shouldFail {
             throw NSError(domain: "MockRouteEstimator", code: -1, userInfo: [NSLocalizedDescriptionKey: "Route not found"])
         }
-        
-        return RouteEstimate(expectedTravelTime: simulatedTime, distance: simulatedDistance)
+
+        let time = timesByDestinationName[destination.name ?? ""] ?? simulatedTime
+        return RouteEstimate(expectedTravelTime: time, distance: simulatedDistance)
     }
 }
