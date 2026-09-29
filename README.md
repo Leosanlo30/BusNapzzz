@@ -4,7 +4,7 @@
 
 ---
 
-## Core Features
+## Purpose — What Exactly the Project Solves
 
 - **Arrival alarm with two triggers** — `TripEngine` fires the alarm when you enter a geofence sized from your lead time (≈ minutes × average bus speed), with a 100 m GPS threshold as a backup. The transition is idempotent: only the first trigger rings.
 - **Survives app termination** — the active trip is persisted (`ActiveTripStore`). If iOS relaunches the app from a geofence event, the trip is restored; orphan geofences from old sessions are purged on launch.
@@ -14,7 +14,9 @@
 - **Alarm settings** — ringtone with preview, vibration toggle (actually honored), custom lead time, and a "test alarm" button. Audio resumes after interruptions (calls, Siri) and only ducks other audio while the alarm rings.
 - **Permission UX** — requests "When in use" on launch, upgrades to "Always" when starting a trip (the trip starts automatically once granted), requests notification permission, and offers a shortcut to iOS Settings when something is missing.
 
----
+- Frequently forget which bus stop they need to get off at.
+- Want to be alerted automatically when their bus is approaching, even while using other apps or with the screen locked.
+- Need a battery-efficient solution that adapts GPS polling frequency based on distance to destination.
 
 ## Tech Stack
 
@@ -32,9 +34,9 @@
 
 ---
 
-## Setup & Installation
+## Documentation: Clone Repo to Test
 
-### Requirements
+### Prerequisites
 
 - Xcode 26.2+
 - iOS 26.2+ (deployment target)
@@ -43,8 +45,14 @@
 ### Run
 
 ```bash
+# Clone the repository
 git clone https://github.com/Leosanlo30/BusNapzzz.git
 cd BusNapzzz
+
+# Switch to the rutas_Merida branch (Merida bus route data)
+git checkout rutas_Merida
+
+# Open in Xcode
 open BusNap.xcodeproj
 ```
 
@@ -99,6 +107,37 @@ BusNap/
 └── Utilities/
     └── GeoJSONManager.swift     # GeoJSON decoder
 ```
+
+---
+
+## MVP Checklist
+
+- [x] App compiles and runs on physical device
+- [x] User can select destination on map
+- [x] User can select and persist lead time (3 / 5 / custom minutes)
+- [x] App calculates ETA or shows offline fallback
+- [x] App detects online/offline status
+- [x] App validates location permissions (Always required)
+- [x] App registers region monitoring (geofence)
+- [x] App fires local notification near destination
+- [x] App can cancel trip and clean up GPS/notifications
+- [x] Unit tests for trip logic (TripEngine, Geofence, TripMath, etc.)
+- [x] UI tests for launch and basic flow
+
+---
+
+## User Acceptance Criteria (8 HUs)
+
+| ID | User Action | Goal |
+|---|---|---|
+| HU01 | Drop a pin on the map as destination | App triggers alarm when entering geofence |
+| HU02 | Cancel an active trip | Stops GPS, purges scheduled notifications |
+| HU03 | Configure alert based on ETA | Wakes user with exact lead time before stop |
+| HU04 | Update destination coordinates mid-trip | Recalculates geofence + ETA without restart |
+| HU05 | Select lead time from preset options | Customizable alarm trigger time |
+| HU06 | App remembers last selected lead time | Faster trip setup via UserDefaults persistence |
+| HU07 | App warns if GPS not set to "Always" | Prevents background alarm failure |
+| HU08 | Offline indicator shown when no internet | Confirms fallback algorithm is active |
 
 ---
 
