@@ -93,6 +93,15 @@ struct SettingsView: View {
         @Bindable var settings = settings
 
         return Section {
+            Picker(selection: Binding(get: { settings.travelMode },
+                                      set: { viewModel.updateTravelMode($0) })) {
+                ForEach(TravelMode.allCases) { mode in
+                    Label(mode.label, systemImage: mode.icon).tag(mode)
+                }
+            } label: {
+                SettingsLabel("Cómo viajo", icon: "arrow.triangle.turn.up.right.diamond.fill", color: .green)
+            }
+
             Picker(selection: $settings.mapStyle) {
                 ForEach(MapStyleOption.allCases) { option in
                     Text(option.label).tag(option)

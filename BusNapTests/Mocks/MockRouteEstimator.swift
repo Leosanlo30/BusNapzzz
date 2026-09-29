@@ -20,15 +20,19 @@ struct MockRouteEstimator: RouteEstimating {
     var timesByDestinationName: [String: TimeInterval] = [:]
     /// Retrasos distintos por nombre de destino, para simular carreras.
     var delaysByDestinationName: [String: Duration] = [:]
+    /// Tiempos distintos por modo de viaje, para verificar qué modo se pidió.
+    var timesByMode: [TravelMode: TimeInterval] = [:]
+    var approximateModes: Set<TravelMode> = []
 
-    func estimateRoute(to destination: Destination, from currentLocation: CLLocation?) async throws -> RouteEstimate {
+    func estimateRoute(to destination: Destination, from currentLocation: CLLocation?, mode: TravelMode) async throws -> RouteEstimate {
         try await Task.sleep(for: delaysByDestinationName[destination.name ?? ""] ?? delay)
 
         if shouldFail {
             throw NSError(domain: "MockRouteEstimator", code: -1, userInfo: [NSLocalizedDescriptionKey: "Route not found"])
         }
 
-        let time = timesByDestinationName[destination.name ?? ""] ?? simulatedTime
-        return RouteEstimate(expectedTravelTime: time, distance: simulatedDistance)
+        let time = timesByDestinationName[destination.name ?? ""] ?? timesByMode[mode] ?? simulatedTime
+        return RouteEstimate(expectedTravelTime: time, distance: simulatedDistance,
+                             isApproximate: approximateModes.contains(mode))
     }
 }

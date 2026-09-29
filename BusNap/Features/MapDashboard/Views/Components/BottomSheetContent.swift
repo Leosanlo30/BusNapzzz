@@ -148,37 +148,36 @@ struct BottomSheetContent: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Favoritos")
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(viewModel.savedFavorites, id: \.self) { fav in
-                        Button {
-                            viewModel.selectFavorite(fav)
-                        } label: {
-                            VStack(spacing: 6) {
-                                Image(systemName: fav.icon ?? "star.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(.white)
-                                    .frame(width: 52, height: 52)
-                                    .background(AppConstants.Colors.primaryAccent.gradient, in: Circle())
-                                Text(fav.name ?? "Favorito")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 68)
+            // Cuadrícula de 4 columnas que ocupa todo el ancho y crece hacia abajo.
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
+                      alignment: .center, spacing: 16) {
+                ForEach(viewModel.savedFavorites, id: \.self) { fav in
+                    Button {
+                        viewModel.selectFavorite(fav)
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: fav.icon ?? "star.fill")
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                                .frame(width: 52, height: 52)
+                                .background(AppConstants.Colors.primaryAccent.gradient, in: Circle())
+                            Text(fav.name ?? "Favorito")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
                         }
-                        .buttonStyle(.hapticLight)
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                viewModel.removeFavorite(fav)
-                            } label: {
-                                Label("Eliminar favorito", systemImage: "trash")
-                            }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.hapticLight)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            viewModel.removeFavorite(fav)
+                        } label: {
+                            Label("Eliminar favorito", systemImage: "trash")
                         }
                     }
                 }
-                .padding(.vertical, 2)
             }
         }
     }
@@ -248,6 +247,8 @@ struct BottomSheetContent: View {
                     ErrorBanner(message: message, needsSettings: viewModel.errorNeedsSettings)
                 }
 
+                travelModePicker
+
                 routeSummary
 
                 LeadTimePickerView(viewModel: viewModel)
@@ -277,6 +278,38 @@ struct BottomSheetContent: View {
         }
     }
 
+    /// Selector "¿Cómo viajas?": recalcula la ruta y el radio de alarma.
+    private var travelModePicker: some View {
+        HStack(spacing: 8) {
+            ForEach(TravelMode.allCases) { mode in
+                let isSelected = viewModel.settings.travelMode == mode
+                Button {
+                    viewModel.updateTravelMode(mode)
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: mode.icon)
+                            .font(.body.weight(.semibold))
+                        Text(mode.shortLabel)
+                            .font(.caption.weight(isSelected ? .semibold : .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(isSelected ? AnyShapeStyle(AppConstants.Colors.primaryAccent) : AnyShapeStyle(Color.clear))
+                    }
+                    .innerClearContainer(cornerRadius: 12)
+                }
+                .buttonStyle(.hapticLight)
+                .accessibilityLabel(mode.label)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .animation(.busnapSpring, value: isSelected)
+            }
+        }
+    }
+
     @ViewBuilder
     private var routeSummary: some View {
         if viewModel.isLoadingETA {
@@ -302,6 +335,14 @@ struct BottomSheetContent: View {
             .padding(.vertical, 12)
             .themeCard(cornerRadius: 14)
             .transition(.opacity)
+
+            if viewModel.isETAApproximate {
+                Label("Apple Maps no tiene horarios de transporte público en esta zona; el tiempo es una estimación según la distancia.",
+                      systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 

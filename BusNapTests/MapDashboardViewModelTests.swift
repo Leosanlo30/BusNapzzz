@@ -157,6 +157,78 @@ struct MapDashboardViewModelTests {
         #expect(viewModel.simulatedETA == 222)
     }
 
+    // MARK: - Modo de viaje
+
+    @Test("El ETA se calcula con el modo de viaje elegido")
+    func testETAUsesSelectedTravelMode() async {
+        var estimator = MockRouteEstimator()
+        estimator.timesByMode = [.automobile: 300, .transit: 900, .walking: 2400]
+        let env = TestEnvironment()
+        env.settings.travelMode = .walking
+        let viewModel = env.makeViewModel(routeEstimator: estimator)
+
+        viewModel.updateDestination(facultad)
+        await waitUntil { viewModel.simulatedETA != nil }
+
+        #expect(viewModel.simulatedETA == 2400)
+    }
+
+    @Test("Cambiar el modo recalcula la ruta y lo guarda")
+    func testChangingTravelModeRefetchesETA() async {
+        var estimator = MockRouteEstimator()
+        estimator.timesByMode = [.automobile: 300, .transit: 900, .walking: 2400]
+        let env = TestEnvironment()
+        let viewModel = env.makeViewModel(routeEstimator: estimator)
+        viewModel.updateDestination(facultad)
+        await waitUntil { viewModel.simulatedETA == 900 }
+
+        viewModel.updateTravelMode(.automobile)
+        await waitUntil { viewModel.simulatedETA == 300 }
+
+        #expect(viewModel.simulatedETA == 300)
+        #expect(env.settings.travelMode == .automobile)
+    }
+
+    @Test("El radio de alarma depende del modo de viaje")
+    func testAlarmRadiusDependsOnTravelMode() {
+        let env = TestEnvironment()
+        let viewModel = env.makeViewModel()
+        viewModel.updateLeadTime(.fiveMinutes)
+
+        env.settings.travelMode = .automobile
+        let car = viewModel.alarmRadius
+        env.settings.travelMode = .walking
+        let walk = viewModel.alarmRadius
+
+        #expect(car == 5 * 60 * TravelMode.automobile.averageSpeed)
+        #expect(walk == 5 * 60 * TravelMode.walking.averageSpeed)
+        #expect(car > walk)
+    }
+
+    @Test("Se marca el ETA como aproximado cuando no hay datos de transporte")
+    func testApproximateTransitETAIsFlagged() async {
+        var estimator = MockRouteEstimator()
+        estimator.approximateModes = [.transit]
+        let viewModel = TestEnvironment().makeViewModel(routeEstimator: estimator)
+
+        viewModel.updateDestination(facultad)
+        await waitUntil { viewModel.simulatedETA != nil }
+
+        #expect(viewModel.isETAApproximate)
+    }
+
+    @Test("El viaje registra la geocerca con el radio del modo elegido")
+    func testTripUsesTravelModeRadius() {
+        let env = TestEnvironment()
+        env.settings.travelMode = .automobile
+        let viewModel = env.makeViewModel()
+
+        viewModel.updateDestination(facultad)
+        viewModel.activateTrip()
+
+        #expect(env.geofence.monitoredRadius == TripEngine.alarmRadius(forLeadTimeMinutes: 5, mode: .automobile))
+    }
+
     // MARK: - Preferencias
 
     @Test("Recupera el tiempo de aviso guardado al inicializarse")

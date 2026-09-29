@@ -44,15 +44,15 @@ final class TripEngine {
     // MARK: - Constantes
 
     /// Velocidad media estimada de un autobús urbano (m/s ≈ 20 km/h).
-    static let estimatedBusSpeed: CLLocationSpeed = 5.5
-    /// Radio mínimo de la geocerca: por debajo, iOS la dispara con poca fiabilidad.
-    static let minimumAlarmRadius: CLLocationDistance = 500
+    static let estimatedBusSpeed: CLLocationSpeed = TravelMode.transit.averageSpeed
+    /// Radio mínimo de la geocerca en vehículo: por debajo, iOS la dispara con poca fiabilidad.
+    static let minimumAlarmRadius: CLLocationDistance = TravelMode.transit.minimumAlarmRadius
     /// Un viaje más largo que esto se considera abandonado al restaurar.
     static let maxTripDuration: TimeInterval = 4 * 3600
 
     /// Radio de la zona de alarma para un tiempo de aviso dado.
-    static func alarmRadius(forLeadTimeMinutes minutes: Int) -> CLLocationDistance {
-        max(minimumAlarmRadius, Double(minutes * 60) * estimatedBusSpeed)
+    static func alarmRadius(forLeadTimeMinutes minutes: Int, mode: TravelMode = .transit) -> CLLocationDistance {
+        max(mode.minimumAlarmRadius, Double(minutes * 60) * mode.averageSpeed)
     }
 
     var isMonitoring: Bool { state == .monitoring || state == .criticalZone }
@@ -99,7 +99,7 @@ final class TripEngine {
     // MARK: - Ciclo de Vida
 
     func startTrip(to destination: Destination, leadTime: AlertLeadTime,
-                   soundName: String = "alarm", vibrate: Bool = true) {
+                   soundName: String = "alarm", vibrate: Bool = true, mode: TravelMode = .transit) {
         let trip = ActiveTrip(
             id: UUID(),
             destination: destination,
@@ -115,7 +115,7 @@ final class TripEngine {
         alarmPlayer.prepare()
         geofenceMonitor.startMonitoring(
             destination: destination,
-            radius: Self.alarmRadius(forLeadTimeMinutes: leadTime.minutes),
+            radius: Self.alarmRadius(forLeadTimeMinutes: leadTime.minutes, mode: mode),
             identifier: trip.regionIdentifier
         )
         state = .monitoring
