@@ -75,6 +75,11 @@ final class AppSettings {
     var vibrationEnabled: Bool { didSet { defaults.set(vibrationEnabled, forKey: Keys.vibration) } }
     var customLeadTimeMinutes: Int { didSet { defaults.set(customLeadTimeMinutes, forKey: Keys.customLeadTime) } }
 
+    // MARK: Ruta
+
+    /// Cómo viaja el usuario: define el cálculo de la ruta y el radio de alarma.
+    var travelMode: TravelMode { didSet { defaults.set(travelMode.rawValue, forKey: Keys.travelMode) } }
+
     // MARK: Mapa
 
     var mapStyle: MapStyleOption { didSet { defaults.set(mapStyle.rawValue, forKey: Keys.mapStyle) } }
@@ -91,6 +96,7 @@ final class AppSettings {
         ringtoneName = defaults.string(forKey: Keys.ringtone) ?? "alarm"
         vibrationEnabled = defaults.object(forKey: Keys.vibration) as? Bool ?? true
         customLeadTimeMinutes = defaults.object(forKey: Keys.customLeadTime) as? Int ?? 10
+        travelMode = defaults.string(forKey: Keys.travelMode).flatMap(TravelMode.init) ?? .transit
         mapStyle = defaults.string(forKey: Keys.mapStyle).flatMap(MapStyleOption.init) ?? .standard
         showsTraffic = defaults.object(forKey: Keys.traffic) as? Bool ?? false
         showsTransitStops = defaults.object(forKey: Keys.transitStops) as? Bool ?? true
@@ -122,6 +128,7 @@ final class AppSettings {
         static let ringtone = "ringtoneName"
         static let vibration = "vibrationEnabled"
         static let customLeadTime = "customLeadTime"
+        static let travelMode = "busnap.route.travelMode"
         static let mapStyle = "busnap.map.style"
         static let traffic = "busnap.map.traffic"
         static let transitStops = "busnap.map.transitStops"

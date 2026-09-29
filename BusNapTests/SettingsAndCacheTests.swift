@@ -17,12 +17,14 @@ struct SettingsAndCacheTests {
         settings.mapStyle = .satellite
         settings.vibrationEnabled = false
         settings.customLeadTimeMinutes = 7
+        settings.travelMode = .walking
 
         let reloaded = AppSettings(defaults: defaults)
 
         #expect(reloaded.mapStyle == .satellite)
         #expect(reloaded.vibrationEnabled == false)
         #expect(reloaded.customLeadTimeMinutes == 7)
+        #expect(reloaded.travelMode == .walking)
     }
 
     @Test("Formatea distancias en la unidad elegida")

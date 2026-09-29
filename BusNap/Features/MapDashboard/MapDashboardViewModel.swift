@@ -85,6 +85,9 @@ final class MapDashboardViewModel {
     /// Distancia de la ruta estimada, en metros.
     var routeDistance: CLLocationDistance? = nil
 
+    /// `true` si el tiempo estimado es aproximado (sin datos de transporte público en la zona).
+    var isETAApproximate: Bool = false
+
     /// Momento en que se calculó `simulatedETA`, para mostrar la hora de llegada.
     var etaUpdatedAt: Date? = nil
 
@@ -133,7 +136,7 @@ final class MapDashboardViewModel {
 
     /// Radio de la zona de alarma para el tiempo de aviso actual.
     var alarmRadius: CLLocationDistance {
-        TripEngine.alarmRadius(forLeadTimeMinutes: leadTime.minutes)
+        TripEngine.alarmRadius(forLeadTimeMinutes: leadTime.minutes, mode: settings.travelMode)
     }
 
     /// Hora estimada de llegada.
@@ -451,7 +454,8 @@ final class MapDashboardViewModel {
                 to: destination,
                 leadTime: leadTime,
                 soundName: settings.ringtoneName,
-                vibrate: settings.vibrationEnabled
+                vibrate: settings.vibrationEnabled,
+                mode: settings.travelMode
             )
             isPaused = false
             errorMessage = nil
@@ -494,6 +498,17 @@ final class MapDashboardViewModel {
     }
 
     // MARK: - Configuration
+
+    /// Cambia la forma de viajar y recalcula la ruta del destino actual.
+    func updateTravelMode(_ mode: TravelMode) {
+        guard mode != settings.travelMode else { return }
+        settings.travelMode = mode
+        guard let destination = selectedDestination else { return }
+        simulatedETA = nil
+        routeDistance = nil
+        routePath = []
+        fetchETA(for: destination)
+    }
 
     func updateLeadTime(_ newTime: AlertLeadTime) {
         leadTime = newTime
@@ -589,14 +604,16 @@ final class MapDashboardViewModel {
     private func fetchETA(for destination: Destination, from currentLocation: CLLocation? = nil) {
         etaTask?.cancel()
         if simulatedETA == nil { isLoadingETA = true }
+        let mode = settings.travelMode
 
         etaTask = Task {
             defer { if !Task.isCancelled { isLoadingETA = false } }
             do {
-                let estimate = try await routeEstimator.estimateRoute(to: destination, from: currentLocation)
+                let estimate = try await routeEstimator.estimateRoute(to: destination, from: currentLocation, mode: mode)
                 try Task.checkCancellation()
                 simulatedETA = estimate.expectedTravelTime
                 routeDistance = estimate.distance
+                isETAApproximate = estimate.isApproximate
                 etaUpdatedAt = .now
                 if !estimate.path.isEmpty { routePath = estimate.path }
                 if errorMessage != nil, !errorNeedsSettings { errorMessage = nil }

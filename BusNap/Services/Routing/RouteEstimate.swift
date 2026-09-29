@@ -23,4 +23,7 @@ struct RouteEstimate: Sendable {
     let distance: CLLocationDistance
     /// Geometría de la ruta para dibujarla en el mapa. Vacía si no está disponible.
     var path: [RouteCoordinate] = []
+    /// `true` si el tiempo es una aproximación (p. ej. no hay datos de
+    /// transporte público en la zona y se estimó a partir de la ruta en coche).
+    var isApproximate: Bool = false
 }
