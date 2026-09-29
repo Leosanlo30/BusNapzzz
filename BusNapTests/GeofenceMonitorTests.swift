@@ -12,27 +12,14 @@ import CoreLocation
 
 @MainActor
 struct GeofenceMonitorTests {
-    
-    @Test("Verificar que coordenadas inválidas son rechazadas por el monitor")
+
+    @Test("Coordenadas inválidas son rechazadas sin colapsar")
     func testStartMonitoringRejectsInvalidCoordinates() {
-        // Arrange
         let monitor = GeofenceMonitor()
-        
-        // Una latitud válida va de -90 a 90. Una longitud de -180 a 180.
-        // Aquí forzamos coordenadas imposibles.
-        let invalidDestination = Destination(
-            name: "Lugar Inexistente",
-            latitude: 150.0,
-            longitude: 200.0
-        )
-        
-        // Act
-        // Si el monitor no tiene el guard, CLLocationManager arrojaría una excepción silenciosa.
-        monitor.startMonitoring(destination: invalidDestination, radius: 1000.0)
-        
-        // Assert
-        // Si el código llega aquí sin colapsar, nuestra protección 'guard CLLocationCoordinate2DIsValid'
-        // funcionó correctamente y la llamada se abortó con seguridad.
-        #expect(true)
+        let invalidDestination = Destination(name: "Lugar Inexistente", latitude: 150.0, longitude: 200.0)
+
+        // Si el guard 'CLLocationCoordinate2DIsValid' no existiera, CoreLocation fallaría.
+        monitor.startMonitoring(destination: invalidDestination, radius: 1000.0, identifier: "test")
+        monitor.stopMonitoring()
     }
 }

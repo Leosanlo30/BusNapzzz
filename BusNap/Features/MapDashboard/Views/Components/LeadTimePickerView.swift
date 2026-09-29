@@ -8,7 +8,7 @@ struct LeadTimePickerView: View {
         [
             .threeMinutes,
             .fiveMinutes,
-            .safeCustom(minutes: viewModel.customLeadTimeMinutes)
+            .safeCustom(minutes: viewModel.settings.customLeadTimeMinutes)
         ]
     }
 

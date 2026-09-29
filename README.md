@@ -1,17 +1,18 @@
 # BusNap
 
-**Native iOS public transit alighting alarm.** Parse GeoJSON bus networks, select a stop, and get an alarm when your bus approaches — all with adaptive GPS to save battery.
+**Native iOS public transit alighting alarm.** Pick where you get off, start the trip, and fall asleep: BusNap wakes you up before your stop — even with the screen locked — using geofences and adaptive GPS to save battery.
 
 ---
 
 ## Core Features
 
-- **GeoJSON Parsing** — Loads OpenStreetMap bus-stop data (Point geometries with `name`, `ref`, `operator`) via a dedicated `GeoJSONManager`. Supports two formats: flat `PARADEROS_MERIDA` and route-linked `RUTAS_Merida`.
-- **Adaptive Location Polling** — `AdaptiveLocationManager` dynamically switches Core Location accuracy based on distance to the target stop: `kCLLocationAccuracyThreeKilometers` (far), `kCLLocationAccuracyKilometer` (medium), `kCLLocationAccuracyBestForNavigation` (near). Background updates enabled with `allowsBackgroundLocationUpdates`.
-- **Custom MapKit Annotations** — Lightweight `BusStopAnnotation` views rasterized via `.drawingGroup()` with spatial bounding-box filtering (`stopsInSight`) to cap visible views at ~50 stops.
-- **Diacritic-Insensitive Search** — Stop and route search ignores accents and case via `String.folding(options: .diacriticInsensitive)`.
-- **Proximity Alarm** — `TripEngine` + `GeofenceMonitor` trigger arrival at 1,000 m; dedicated 100 m trigger via `AdaptiveLocationManager` distance stream.
-- **Theming Engine** — Liquid-glass `ultraThinMaterial` sheet themes with persistent selection via `UserDefaults`.
+- **Arrival alarm with two triggers** — `TripEngine` fires the alarm when you enter a geofence sized from your lead time (≈ minutes × average bus speed), with a 100 m GPS threshold as a backup. The transition is idempotent: only the first trigger rings.
+- **Survives app termination** — the active trip is persisted (`ActiveTripStore`). If iOS relaunches the app from a geofence event, the trip is restored; orphan geofences from old sessions are purged on launch.
+- **Adaptive GPS, only during a trip** — `AdaptiveLocationManager` is off until you start a trip, then switches accuracy by distance (3 km → 1 km → navigation-grade under 1 km). In the background it saves battery far from the stop but never near it. Automatic pausing is disabled so a bus stuck in traffic doesn't lose tracking.
+- **Apple Maps–style search** — live autocomplete (`MKLocalSearchCompleter`), full search with a bounded offline cache (`Caches/`, LRU, accent-insensitive), favorites, and recent trips. Tapping the map reverse-geocodes the point's name.
+- **Map settings** — Explore / Transit / Hybrid / Satellite styles, public-transport stops, traffic, 3D buildings, follow-me during the trip, and distance units. Route line and alarm-zone circle drawn on the map.
+- **Alarm settings** — ringtone with preview, vibration toggle (actually honored), custom lead time, and a "test alarm" button. Audio resumes after interruptions (calls, Siri) and only ducks other audio while the alarm rings.
+- **Permission UX** — requests "When in use" on launch, upgrades to "Always" when starting a trip (the trip starts automatically once granted), requests notification permission, and offers a shortcut to iOS Settings when something is missing.
 
 ---
 
@@ -19,15 +20,15 @@
 
 | Layer             | Technology |
 |-------------------|------------|
-| Language          | Swift 5.9+ |
-| UI Framework      | SwiftUI (iOS 17+) |
-| Architecture      | MVVM with `@Observable` |
-| Maps              | MapKit (`MapCameraPosition`, `MapReader`, `Annotation`, `Marker`) |
+| Language          | Swift 5 mode, Xcode 26 |
+| UI Framework      | SwiftUI (iOS 26.2+) |
+| Architecture      | MVVM with `@Observable`, protocol-based dependency injection |
+| Maps              | MapKit (`Map`, `MapPolyline`, `MapCircle`, `mapScope` controls, `MKLocalSearchCompleter`, `MKReverseGeocodingRequest`) |
 | Location          | CoreLocation (`CLLocationManager`, `CLCircularRegion`) |
-| Persistence       | `UserDefaults` / `@AppStorage` |
-| GeoJSON           | `Codable` + custom `Decodable` models |
-| Concurrency       | `async/await`, `Task`, `@MainActor` |
-| Notifications     | `UNUserNotificationCenter` via `NotificationManager` |
+| Persistence       | `UserDefaults` via `AppSettings`, `UserPreferencesStoring`, `ActiveTripStoring` |
+| Concurrency       | `async/await`, cancellable `Task`s, `@MainActor` |
+| Notifications     | `UNUserNotificationCenter` (time-sensitive) |
+| Logging           | `os.Logger` (`Log.trip`, `Log.location`, …) with private-by-default interpolation |
 
 ---
 
@@ -35,12 +36,11 @@
 
 ### Requirements
 
-- Xcode 15.4+
-- iOS 17.0+ (Deployment Target)
-- Swift 5.9+
-- CocoaPods / SPM **not required** — all dependencies are system frameworks.
+- Xcode 26.2+
+- iOS 26.2+ (deployment target)
+- No third-party dependencies — system frameworks only.
 
-### Steps
+### Run
 
 ```bash
 git clone https://github.com/Leosanlo30/BusNapzzz.git
@@ -48,21 +48,28 @@ cd BusNapzzz
 open BusNap.xcodeproj
 ```
 
-1. Select a simulator or a physical device running iOS 17+.
-2. Build and run (`Cmd+R`).
-3. Grant **Always** location permission when prompted — required for background alarms.
-4. Pan/zoom the Mérida map to see bus stops appear at street-level zoom.
-5. Tap a stop or type its name in the search sheet to set it as destination.
-6. Press **Iniciar Viaje** to start monitoring. The GPS accuracy adapts automatically as you approach.
+1. Select a simulator or device and run (`Cmd+R`).
+2. Allow location **"While Using"** at launch, then **"Always"** when starting the first trip — required for background alarms.
+3. Allow notifications so the alarm is visible on the lock screen.
+4. Search for a place or tap the map, choose the lead time, and press **Iniciar viaje**.
+
+### Simulating a trip
+
+`BusNap/TestRoutes/` contains GPX files (e.g. `RutaVaYVenCanek.gpx`). In Xcode: *Debug → Simulate Location → Add GPX File to Workspace…*, pick one, and set your destination along the route to hear the alarm without leaving your desk.
+
+### Tests
+
+```bash
+xcodebuild test -project BusNap.xcodeproj -scheme BusNap \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:BusNapTests CODE_SIGNING_ALLOWED=NO
+```
+
+Unit tests use in-memory mocks for location, geofences, notifications, audio, and storage (`BusNapTests/Mocks/`) — no real hardware, `UserDefaults.standard`, or sound. The same command runs in GitHub Actions (`.github/workflows/swift.yml`).
 
 ### GeoJSON Data
 
-The app bundles three OpenStreetMap-derived GeoJSON files under `Resources/Navigation/`:
-
-- `PARADEROS_MERIDA.geojson` — Primary stop list (name + ref + coordinates)
-- `RUTAS_Merida.geojson` / `RUTAS_Merida_2.geojson` — Route-linked stops with `@relations`
-
-Additional test route GPX files are in `TestRoutes/`.
+`Resources/Navigation/` bundles OpenStreetMap-derived Mérida bus stop and route data (`PARADEROS_MERIDA.geojson`, `RUTAS_Merida*.geojson`), parsed by `GeoJSONManager`. Stop display is currently disabled in the UI and planned for reactivation.
 
 ---
 
@@ -72,20 +79,23 @@ Additional test route GPX files are in `TestRoutes/`.
 BusNap/
 ├── BusNapApp.swift              # App entry point
 ├── Core/
+│   ├── Logging/                 # os.Logger categories
 │   ├── TripEngine/              # Trip state machine + alarm dispatch
-│   ├── Theme/                   # AppConstants, EnvironmentKeys
-│   ├── Storage/                 # UserPreferencesStoring protocol + impl
+│   ├── Theme/                   # AppConstants, ThemeManager, glass modifiers
+│   ├── Storage/                 # AppSettings, preferences, active-trip persistence
 │   └── UIComponents/            # Reusable SwiftUI views
 ├── Features/
-│   └── MapDashboard/            # Main screen: ViewModel + Views
-├── Models/                      # BusStop, Destination, TripState, etc.
-├── Resources/                   # GeoJSON, audio alarms, assets
+│   ├── MapDashboard/            # Main screen: ViewModel, map canvas, bottom sheet
+│   └── Settings/                # Alarm, map, permissions, appearance
+├── Models/                      # Destination, AlertLeadTime, PlaceResult, …
+├── Resources/                   # GeoJSON, alarm sounds
 ├── Services/
-│   ├── Location/                # AdaptiveLocationManager, GeofenceMonitor, etc.
-│   ├── Routing/                 # MapKit ETA estimation
-│   ├── Notifications/           # Alarm scheduling
+│   ├── Location/                # AdaptiveLocationManager, GeofenceMonitor
+│   ├── Routing/                 # MapKit ETA + route geometry
+│   ├── Search/                  # Autocomplete, search, offline cache
+│   ├── Notifications/           # Alarm notifications
 │   ├── Network/                 # Reachability monitoring
-│   └── AudioManager.swift       # Alarm playback
+│   └── AudioManager.swift       # Alarm playback, vibration, preview
 └── Utilities/
     └── GeoJSONManager.swift     # GeoJSON decoder
 ```

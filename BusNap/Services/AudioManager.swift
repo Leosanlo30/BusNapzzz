@@ -5,100 +5,172 @@
 //  Created by Leonardo Ariel San Martin Lopez  on 11/07/26.
 //
 
+import OSLog
 import Foundation
 import AVFoundation
 import AudioToolbox // Vibracion
 
-class AudioManager {
+/// Contrato de reproducción de la alarma, inyectable para tests.
+@MainActor
+protocol AlarmPlaying: AnyObject {
+    /// Deja la sesión de audio lista mientras la app está en primer plano,
+    /// para poder sonar después desde segundo plano.
+    func prepare()
+    func playAlarm(soundName: String, vibrate: Bool)
+    func stopAlarm()
+}
+
+@MainActor
+final class AudioManager: AlarmPlaying {
     static let shared = AudioManager()
+
     private var audioPlayer: AVAudioPlayer?
+    private var previewPlayer: AVAudioPlayer?
     private var vibrationTask: Task<Void, Never>?
-    private var isVibrating = false
-    
-    private init() {}
-    
-    // NUEVA FUNCIÓN: Se llama en primer plano para calentar el motor
-    func prepareAudioEngine() {
+    private var previewStopTask: Task<Void, Never>?
+    private var interruptionObserver: NSObjectProtocol?
+
+    /// `true` mientras la alarma debe estar sonando (aunque una llamada la interrumpa).
+    private(set) var isAlarmActive = false
+
+    private init() {
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            MainActor.assumeIsolated {
+                self?.handleInterruption(rawType: rawType)
+            }
+        }
+    }
+
+    // MARK: - AlarmPlaying
+
+    /// Se llama en primer plano al iniciar el viaje. La sesión se mezcla con
+    /// otras apps: la música del usuario sigue a volumen normal durante el trayecto.
+    func prepare() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try session.setActive(true)
-            print(" Motor de audio encendido en primer plano y listo.")
         } catch {
-            print(" Error al preparar la sesión de audio: \(error.localizedDescription)")
+            Log.audio.error("No se pudo preparar la sesión de audio: \(error.localizedDescription, privacy: .public)")
         }
     }
-    
-    func playAlarm(soundName: String = "alarm") {
+
+    func playAlarm(soundName: String, vibrate: Bool) {
         stopAlarm()
-        
+        stopPreview()
+        isAlarmActive = true
+
+        // La vibración no depende del archivo de audio: si falta, al menos vibra.
+        if vibrate { startVibrationLoop() }
+
         do {
-                try AVAudioSession.sharedInstance().setActive(true)
-            } catch {
-                print("Aviso: No se pudo reactivar la sesión de audio.")
-            }
-        guard let url = Bundle.main.url(forResource: soundName, withExtension: "mp3") else {
-            print(" No se encontró el archivo de sonido.")
-            return
-        }
-        
-        do {
-            audioPlayer = try AVAudioPlayer(contentsOf: url)
-            audioPlayer?.numberOfLoops = -1
-            audioPlayer?.prepareToPlay()
-            audioPlayer?.volume = 1.0
-            audioPlayer?.play()
-            print(" Alarma sonando en loop...")
-            startVibrationLoop()
+            // Ahora sí bajamos el volumen de otras apps: la alarma debe oírse.
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.duckOthers])
+            try session.setActive(true)
         } catch {
-            print(" No se pudo reproducir el archivo: \(error.localizedDescription)")
+            Log.audio.error("No se pudo activar la sesión de audio: \(error.localizedDescription, privacy: .public)")
         }
+
+        guard let player = makePlayer(soundName: soundName) else { return }
+        player.numberOfLoops = -1
+        player.volume = 1.0
+        player.play()
+        audioPlayer = player
+        Log.audio.info("Alarma sonando")
     }
-    
+
+    /// Detiene sonido y vibración siempre, esté o no reproduciéndose el audio
+    /// (p. ej. tras una interrupción por llamada).
     func stopAlarm() {
-        if audioPlayer?.isPlaying == true {
-            audioPlayer?.stop()
-            audioPlayer = nil
-            
-            stopVibrationLoop()
-            
-            // Apagamos el motor de audio para ahorrar batería
-            do {
-                try AVAudioSession.sharedInstance().setActive(false)
-            } catch {
-                print("No se pudo desactivar la sesión de audio.")
-            }
-            
-            print(" Alarma detenida.")
+        isAlarmActive = false
+        vibrationTask?.cancel()
+        vibrationTask = nil
+
+        guard let player = audioPlayer else { return }
+        player.stop()
+        audioPlayer = nil
+        deactivateSession()
+    }
+
+    // MARK: - Preview
+
+    /// Reproduce unos segundos de un tono para elegirlo en Ajustes.
+    func previewSound(named soundName: String, vibrate: Bool = false, duration: Duration = .seconds(3)) {
+        guard !isAlarmActive else { return }
+        stopPreview()
+
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .default, options: [.duckOthers])
+        try? session.setActive(true)
+
+        if vibrate { AudioServicesPlaySystemSound(kSystemSoundID_Vibrate) }
+        guard let player = makePlayer(soundName: soundName) else { return }
+        player.play()
+        previewPlayer = player
+
+        previewStopTask = Task { [weak self] in
+            try? await Task.sleep(for: duration)
+            guard !Task.isCancelled else { return }
+            self?.stopPreview()
         }
     }
-    
-    // MARK: - Funciones de vibracion
+
+    func stopPreview() {
+        previewStopTask?.cancel()
+        previewStopTask = nil
+        guard let player = previewPlayer else { return }
+        player.stop()
+        previewPlayer = nil
+        if !isAlarmActive { deactivateSession() }
+    }
+
+    // MARK: - Private
+
+    private func makePlayer(soundName: String) -> AVAudioPlayer? {
+        guard let url = Bundle.main.url(forResource: soundName, withExtension: "mp3") else {
+            Log.audio.error("No se encontró el sonido \(soundName, privacy: .public).mp3")
+            return nil
+        }
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.prepareToPlay()
+            return player
+        } catch {
+            Log.audio.error("No se pudo cargar el sonido: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    private func deactivateSession() {
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            Log.audio.debug("No se pudo desactivar la sesión de audio")
+        }
+    }
+
+    /// Si una llamada o Siri interrumpe la alarma, la reanudamos al terminar.
+    private func handleInterruption(rawType: UInt?) {
+        guard let rawType, AVAudioSession.InterruptionType(rawValue: rawType) == .ended,
+              isAlarmActive, let player = audioPlayer else { return }
+        try? AVAudioSession.sharedInstance().setActive(true)
+        player.play()
+    }
+
     private func startVibrationLoop() {
-            isVibrating = true
-            
-            // Creamos una tarea asíncrona que vivirá en segundo plano
-            vibrationTask = Task {
-                while isVibrating {
-                    // 1. Primera vibración
-                    AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
-                    
-                    // Pausa cortísima de 0.4 segundos (400 millones de nanosegundos)
-                    try? await Task.sleep(nanoseconds: 400_000_000)
-                    
-                    // 2. Segunda vibración inmediata (efecto "spam" o latido)
-                    AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))
-                    
-                    // Pausa más larga de 1 segundo antes de repetir el ciclo
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
-                }
+        vibrationTask = Task {
+            while !Task.isCancelled {
+                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+                try? await Task.sleep(for: .milliseconds(400))
+                AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+                try? await Task.sleep(for: .seconds(1))
             }
         }
-        
-        private func stopVibrationLoop() {
-            // Apagamos la bandera y cancelamos la tarea asíncrona
-            isVibrating = false
-            vibrationTask?.cancel()
-            vibrationTask = nil
-        }
+    }
 }

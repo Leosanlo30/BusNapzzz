@@ -6,25 +6,32 @@
 //
 
 import Foundation
-import MapKit
 import CoreLocation
 
-
-// Exigimos que cualquier manejador de ubicación opere bajo la protección del hilo de UI
+/// Contrato del servicio de ubicación. Opera en el hilo principal.
+///
+/// El GPS solo se enciende entre `startTracking(to:)` y `stopTracking()`.
+/// Fuera de un viaje, el punto azul del mapa lo gestiona MapKit por su cuenta.
 @MainActor
-protocol LocationManaging {
+protocol LocationManaging: AnyObject {
     var permissionState: LocationPermissionState { get }
-    func requestWhenInUseAuthorization() // Autorizacion CUANDO SE USA
-    func requestAlwaysAuthorization() //Autorizacion SIEMPRE
-    
-    /* MODO AHORRO */
-    func enableEcoMode()
-    func disableEcoMode()
-    
-    func setLocationHandler(_ handler: @escaping (CLLocation) -> Void) //comunicación para enviar las coordenadas al ViewModel
-
-    // MARK: - Adaptive Targeting
-    func setDestination(_ coordinate: CLLocationCoordinate2D)
-    func clearDestination()
     var distanceToDestination: CLLocationDistance? { get }
+
+    func requestWhenInUseAuthorization()
+    func requestAlwaysAuthorization()
+
+    /// Modo ahorro: la app pasó a segundo plano.
+    func enableEcoMode()
+    /// La app volvió a primer plano.
+    func disableEcoMode()
+
+    /// Recibe cada nueva ubicación mientras hay un viaje activo.
+    func setLocationHandler(_ handler: @escaping (CLLocation) -> Void)
+    /// Recibe cada cambio de permiso (p. ej. tras aceptar "Siempre").
+    func setAuthorizationHandler(_ handler: @escaping (LocationPermissionState) -> Void)
+
+    /// Enciende el GPS adaptativo hacia el destino, también en segundo plano.
+    func startTracking(to coordinate: CLLocationCoordinate2D)
+    /// Apaga el GPS y el permiso de segundo plano.
+    func stopTracking()
 }

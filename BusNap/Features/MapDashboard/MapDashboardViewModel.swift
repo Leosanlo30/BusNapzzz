@@ -5,6 +5,7 @@
 //  Created by Leonardo Ariel San Martin Lopez  on 08/07/26.
 //
 
+import OSLog
 import Foundation
 import SwiftUI
 import Observation
@@ -15,21 +16,15 @@ import MapKit
 
 /// ViewModel central de la pantalla del mapa.
 ///
-/// ``MapDashboardViewModel`` gestiona toda la lógica de negocio para:
-/// - Búsqueda de lugares reales vía MKLocalSearch (Apple Maps).
-/// - Seguimiento de la región visible del mapa.
-/// - Selección de destino, favoritos, ciclo de vida del viaje y
-///   estados de proximidad adaptativa.
-///
-/// La clase está anotada con `@MainActor` y `@Observable` para que las
-/// vistas SwiftUI observen sus propiedades publicadas directamente.
+/// Coordina la búsqueda de lugares, los favoritos y recientes, el ciclo de vida
+/// del viaje (delegado en ``TripEngine``) y el GPS adaptativo.
 @MainActor
 @Observable
 final class MapDashboardViewModel {
 
-    // MARK: - UI State Properties
+    // MARK: - UI State
 
-    /// Whether the trip timer is in a paused state.
+    /// Whether the trip timer is in a paused state (pausa la actualización del ETA).
     var isPaused: Bool = false
 
     /// Whether the bottom sheet is presented.
@@ -39,151 +34,131 @@ final class MapDashboardViewModel {
     var showSettings: Bool = false
 
     /// The currently selected presentation detent for the bottom sheet.
-    var selectedDetent: PresentationDetent = .fraction(0.25)
+    var selectedDetent: PresentationDetent = MapDashboardViewModel.compactDetent
 
     /// The text currently entered in the search bar.
-    var searchText: String = ""
+    var searchText: String = "" {
+        didSet {
+            guard searchText != oldValue else { return }
+            searchResults = []
+            placeSearch.updateQuery(searchText, region: mapVisibleRegion)
+        }
+    }
 
-    // MARK: - Resultados de Búsqueda Local (MKLocalSearch)
-
-    /// Resultados en caché para búsquedas offline.
-    private var searchCache: [String: [PlaceResult]] = [:]
-
-    /// Resultados de la última búsqueda MKLocalSearch.
+    /// Resultados de la última búsqueda completa (al pulsar "Buscar").
     var searchResults: [PlaceResult] = []
 
-    // MARK: - (DESACTIVADO) Propiedades de Paraderos
-    // Se mantienen comentadas para activación futura.
-//    var busStops: [BusStop] = []
-//    var busStopsLoadError: String? = nil
-//    var selectedRoute: String? = nil
-//    var showRouteSearchResults: Bool = false
-//    var selectedStop: BusStop? = nil
+    /// Whether a full search or suggestion resolution is in flight.
+    var isSearching: Bool = false
 
-    // MARK: - Proximity Properties
+    // MARK: - Proximity
 
-    /// Whether the user is within 500 m of the destination stop.
+    /// Whether the user is within 500 m of the destination.
     var isApproachingStop: Bool = false
 
-    /// The current distance from the user to the destination stop, in meters.
+    /// The current distance from the user to the destination, in meters.
     var distanceToStop: CLLocationDistance? = nil
 
-    // MARK: - Map Region Properties
+    // MARK: - Map
 
     /// The last known visible region of the map.
     var mapVisibleRegion: MKCoordinateRegion? = nil
 
-    /// The north–south distance (in meters) the map currently covers.
-    var mapCameraDistance: CLLocationDistance = 0
+    /// Geometría de la ruta estimada hacia el destino.
+    var routePath: [RouteCoordinate] = []
 
-    /// The north–south distance (in meters) below which the map is considered "zoomed in".
-    private let zoomThresholdMeters: CLLocationDistance = 1_500
+    // MARK: - Trip & Destination
 
-    // MARK: - Trip & Destination Properties
-
-    /// The current UI state derived from the trip engine and pause state.
     var tripUIState: TripUIState {
         TripUIState.from(engineState: tripEngine.state, isPaused: isPaused)
     }
 
-    /// The raw trip-engine state.
     var alarmStatus: TripState { tripEngine.state }
 
-    /// The currently selected destination, if any.
     var selectedDestination: Destination? { tripEngine.currentDestination }
 
-    /// The simulated ETA from the current location to the destination, in seconds.
+    var isTripActive: Bool { tripEngine.isMonitoring }
+
+    /// The estimated travel time from the current location to the destination, in seconds.
     var simulatedETA: TimeInterval? = nil
+
+    /// Distancia de la ruta estimada, en metros.
+    var routeDistance: CLLocationDistance? = nil
+
+    /// Momento en que se calculó `simulatedETA`, para mostrar la hora de llegada.
+    var etaUpdatedAt: Date? = nil
 
     /// The user's configured lead time for the arrival alarm.
     var leadTime: AlertLeadTime = .fiveMinutes
 
-    /// Whether an ETA request is currently in flight.
     var isLoadingETA: Bool = false
 
     /// A user-facing error message, or `nil`.
     var errorMessage: String? = nil
 
-    /// Whether the device is offline.
+    /// Si el error se resuelve abriendo la app Ajustes (permisos).
+    var errorNeedsSettings: Bool = false
+
     var isOffline: Bool = false
 
     /// The user-editable display name for the current destination.
     var destinationName: String = ""
 
-    /// The list of user-saved favorite destinations.
     var savedFavorites: [Destination] = []
 
-    /// Whether vibration feedback is enabled for alarms.
-    @ObservationIgnored @AppStorage("vibrationEnabled") var vibrationEnabled = true
+    /// Últimos destinos a los que el usuario inició un viaje.
+    var recentDestinations: [Destination] = []
 
-    /// The name of the ringtone to play for the alarm.
-    var ringtoneName: String = "alarm" {
-        didSet { UserDefaults.standard.set(ringtoneName, forKey: "ringtoneName") }
-    }
+    var notificationPermission: NotificationPermission = .notDetermined
 
-    /// A custom lead-time value (in minutes) used when `leadTime == .custom`.
-    var customLeadTimeMinutes = 10 {
-        didSet { UserDefaults.standard.set(customLeadTimeMinutes, forKey: "customLeadTime") }
-    }
+    /// Preferencias del usuario (alarma y mapa).
+    let settings: AppSettings
 
-    /// The set of detents the bottom sheet can snap to.
+    /// Altura compacta: barra de búsqueda + favoritos, o el resumen del viaje.
+    static let compactDetent: PresentationDetent = .fraction(0.32)
+
     var currentDetents: Set<PresentationDetent> {
-        [.fraction(0.25), .medium, .large]
+        [Self.compactDetent, .medium, .large]
     }
 
-    /// The ideal detent for the current trip UI state.
     var defaultDetent: PresentationDetent {
         switch tripUIState {
-        case .initial:     return .fraction(0.25)
+        case .initial:     return Self.compactDetent
         case .configuring: return .medium
-        case .active:      return .fraction(0.25)
-        case .paused:      return .fraction(0.25)
-        case .finished:    return .fraction(0.35)
+        case .active:      return Self.compactDetent
+        case .paused:      return Self.compactDetent
+        case .finished:    return .medium
         }
     }
 
-    // MARK: - Computed: Zoom & Scale
-
-    /// Whether the map camera is zoomed in beyond `zoomThresholdMeters`.
-    ///
-    /// Uses the north–south distance derived from `mapVisibleRegion`.
-    var isZoomedIn: Bool {
-        guard let region = mapVisibleRegion else { return false }
-        let north = CLLocation(latitude: region.center.latitude + region.span.latitudeDelta / 2,
-                               longitude: region.center.longitude)
-        let south = CLLocation(latitude: region.center.latitude - region.span.latitudeDelta / 2,
-                               longitude: region.center.longitude)
-        return north.distance(from: south) < zoomThresholdMeters
+    /// Radio de la zona de alarma para el tiempo de aviso actual.
+    var alarmRadius: CLLocationDistance {
+        TripEngine.alarmRadius(forLeadTimeMinutes: leadTime.minutes)
     }
 
-    // (DESACTIVADO) Escala de anotaciones de paraderos
-//    var stopAnnotationScale: CGFloat {
-//        guard mapCameraDistance > 0 else { return 0.35 }
-//        let clamped = min(mapCameraDistance, zoomThresholdMeters)
-//        let t = clamped / zoomThresholdMeters
-//        return CGFloat(0.35 + (1.0 - t) * 0.65)
-//    }
+    /// Hora estimada de llegada.
+    var estimatedArrival: Date? {
+        guard let eta = simulatedETA, let updatedAt = etaUpdatedAt else { return nil }
+        return updatedAt.addingTimeInterval(eta)
+    }
 
-    // MARK: - Computed: Search Suggestions
+    // MARK: - Search Suggestions
 
-    /// Sugerencias de búsqueda combinando resultados MKLocalSearch y favoritos.
+    /// Sugerencias combinando favoritos, resultados de búsqueda y autocompletado.
     var searchSuggestions: [SearchSuggestion] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return [] }
 
-        let favoriteMatches = savedFavorites.filter { fav in
-            guard let name = fav.name else { return false }
-            return name.localizedCaseInsensitiveContains(query)
-        }
+        let favoriteMatches = savedFavorites
+            .filter { $0.name?.localizedStandardContains(query) ?? false }
+            .prefix(3)
+            .map(SearchSuggestion.favorite)
 
-        var suggestions: [SearchSuggestion] = []
-        for place in searchResults.prefix(10) {
-            suggestions.append(.place(place))
-        }
-        for fav in favoriteMatches.prefix(5) {
-            suggestions.append(.favorite(fav))
-        }
-        return suggestions
+        let remote: [SearchSuggestion] = searchResults.isEmpty
+            ? placeSearch.suggestions.map(SearchSuggestion.completion)
+            : searchResults.prefix(10).map(SearchSuggestion.place)
+
+        return favoriteMatches + remote
     }
 
     // MARK: - Dependencies
@@ -193,236 +168,209 @@ final class MapDashboardViewModel {
     @ObservationIgnored private let networkMonitor: NetworkMonitoring
     @ObservationIgnored private let locationManager: LocationManaging
     @ObservationIgnored private let tripEngine: TripEngine
+    @ObservationIgnored private let placeSearch: PlaceSearching
 
+    @ObservationIgnored private var etaTask: Task<Void, Never>?
     @ObservationIgnored private var lastETARequestTime: Date = .distantPast
     @ObservationIgnored private var isAppInBackground: Bool = false
-    @ObservationIgnored private var isFetchingETA: Bool = false
+    /// El usuario pulsó "Iniciar viaje" y esperamos a que conceda el permiso.
+    @ObservationIgnored private var pendingActivation: Bool = false
+
+    /// Distancia a la que el GPS dispara la alarma si la geocerca no lo hizo antes.
+    private let arrivalThreshold: CLLocationDistance = 100
+    private let etaRefreshInterval: TimeInterval = 60
+    private let maxRecents = 8
 
     // MARK: - Initialization
 
-    /// Creates a new view model with the given (or default) dependencies.
-    ///
-    /// - Parameters:
-    ///   - routeEstimator: Service for ETA estimation. Defaults to `MapKitRouteEstimator`.
-    ///   - preferencesStore: Persistence for user preferences. Defaults to `UserDefaultsPreferencesStore`.
-    ///   - networkMonitor: Reachability monitor. Defaults to `NetworkMonitor`.
-    ///   - locationManager: Location service. Defaults to `AdaptiveLocationManager`.
-    ///   - tripEngine: Trip state machine. Defaults to `TripEngine`.
     init(
         routeEstimator: RouteEstimating? = nil,
         preferencesStore: UserPreferencesStoring? = nil,
         networkMonitor: NetworkMonitoring? = nil,
         locationManager: LocationManaging? = nil,
-        tripEngine: TripEngine? = nil
+        tripEngine: TripEngine? = nil,
+        placeSearch: PlaceSearching? = nil,
+        settings: AppSettings? = nil
     ) {
         self.routeEstimator = routeEstimator ?? MapKitRouteEstimator()
         self.preferencesStore = preferencesStore ?? UserDefaultsPreferencesStore()
         self.networkMonitor = networkMonitor ?? NetworkMonitor()
         self.locationManager = locationManager ?? AdaptiveLocationManager()
         self.tripEngine = tripEngine ?? TripEngine()
+        self.placeSearch = placeSearch ?? PlaceSearchService()
+        self.settings = settings ?? AppSettings()
 
-        self.leadTime = self.preferencesStore.loadLeadTime()
-        self.ringtoneName = UserDefaults.standard.string(forKey: "ringtoneName") ?? "alarm"
+        leadTime = self.preferencesStore.loadLeadTime()
+        savedFavorites = self.preferencesStore.loadFavorites()
+        recentDestinations = self.preferencesStore.loadRecents()
 
         self.networkMonitor.setStatusHandler { [weak self] offline in
-            guard let self = self else { return }
-            Task { @MainActor in
-                self.isOffline = offline
-            }
+            Task { @MainActor [weak self] in self?.isOffline = offline }
         }
         self.networkMonitor.start()
 
-        self.savedFavorites = self.preferencesStore.loadFavorites()
-
-        self.locationManager.setLocationHandler { [weak self] newLocation in
-            guard let self = self else { return }
-            Task { @MainActor in
-                self.processLocationUpdate(newLocation)
-            }
+        self.locationManager.setLocationHandler { [weak self] location in
+            self?.processLocationUpdate(location)
+        }
+        self.locationManager.setAuthorizationHandler { [weak self] state in
+            self?.handleAuthorizationChange(state)
+        }
+        self.tripEngine.onAlarmTriggered = { [weak self] in
+            self?.handleAlarmTriggered()
         }
 
-        // (DESACTIVADO) Carga de paraderos desde GeoJSON
-//        loadBusStops()
+        // iOS pudo relanzar la app con un viaje en curso: reanudamos el GPS.
+        if self.tripEngine.isMonitoring, let destination = self.tripEngine.currentDestination {
+            destinationName = destination.name ?? ""
+            selectedDetent = defaultDetent
+            self.locationManager.startTracking(to: destination.coordinate)
+        }
     }
 
-    // MARK: - Public: Búsqueda Local (MKLocalSearch)
+    // MARK: - Lifecycle
 
-    /// Ejecuta una búsqueda MKLocalSearch con el texto actual y guarda en caché.
-    @MainActor
+    /// Llamar al mostrar la pantalla. Pide permiso de ubicación "Al usar" para
+    /// mostrar el punto azul; "Siempre" se pide al iniciar el primer viaje.
+    func onAppear() {
+        if permissionState == .notDetermined {
+            locationManager.requestWhenInUseAuthorization()
+        }
+        refreshNotificationPermission()
+    }
+
+    // MARK: - Search
+
+    /// Búsqueda completa con el texto actual (al pulsar "Buscar" en el teclado).
     func performLocalSearch() async {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
 
-        // 1. Intentar cargar desde caché offline primero
-        if let cached = loadCachedResults(for: query) {
-            self.searchResults = cached
-            return
-        }
-
-        // 2. Consultar Apple Maps
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = query
-        if let region = mapVisibleRegion {
-            request.region = region
-        }
-
-        let search = MKLocalSearch(request: request)
+        isSearching = true
+        defer { isSearching = false }
         do {
-            let response = try await search.start()
-            let results = response.mapItems.map { PlaceResult(mapItem: $0) }
-            self.searchResults = results
-            saveCachedResults(results, for: query)
+            let results = try await placeSearch.search(query, region: mapVisibleRegion)
+            // Si el usuario siguió escribiendo, estos resultados ya no aplican.
+            guard query == searchText.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            searchResults = results
         } catch {
-            print("MKLocalSearch falló: \(error.localizedDescription)")
-            // Si falla la red, intentar caché de nuevo
-            if let cached = loadCachedResults(for: query) {
-                self.searchResults = cached
+            Log.search.error("Búsqueda falló: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    func clearSearch() {
+        searchText = ""
+        searchResults = []
+    }
+
+    func selectSuggestion(_ suggestion: SearchSuggestion) async {
+        switch suggestion {
+        case .place(let place):
+            selectPlace(place)
+        case .favorite(let destination):
+            clearSearch()
+            updateDestination(destination)
+        case .completion(let completion):
+            isSearching = true
+            defer { isSearching = false }
+            do {
+                if let place = try await placeSearch.resolve(completion) {
+                    selectPlace(place)
+                }
+            } catch {
+                errorMessage = "No pudimos abrir ese lugar. Revisa tu conexión."
+                errorNeedsSettings = false
             }
         }
     }
 
     /// Selecciona un PlaceResult y crea un destino con sus coordenadas.
     func selectPlace(_ place: PlaceResult) {
-        searchText = ""
-        let dest = Destination(
-            name: place.name,
-            latitude: place.latitude,
-            longitude: place.longitude
-        )
-        updateDestination(dest)
+        clearSearch()
+        updateDestination(Destination(name: place.name, latitude: place.latitude, longitude: place.longitude))
     }
 
-    // MARK: - Cache Offline de Búsquedas
+    // MARK: - Map Interaction
 
-    private let cacheFileName = "search_cache.json"
+    /// Tocar el mapa coloca un destino; durante un viaje se ignora para no
+    /// cancelarlo por accidente.
+    func handleMapTap(at coordinate: CLLocationCoordinate2D) {
+        guard !isTripActive, tripUIState != .finished else { return }
+        let placeholder = "Punto seleccionado"
+        let destination = Destination(name: placeholder, latitude: coordinate.latitude, longitude: coordinate.longitude)
+        updateDestination(destination)
 
-    private func cacheFileURL() -> URL? {
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        return paths.first?.appendingPathComponent(cacheFileName)
-    }
-
-    private func saveCachedResults(_ results: [PlaceResult], for query: String) {
-        var cache = searchCache
-        cache[query] = results
-        searchCache = cache
-        persistCache(cache)
-    }
-
-    private func loadCachedResults(for query: String) -> [PlaceResult]? {
-        if let cached = searchCache[query] { return cached }
-        // Intentar cargar desde disco
-        guard let url = cacheFileURL(),
-              let data = try? Data(contentsOf: url),
-              let decoded = try? JSONDecoder().decode([String: [PlaceResult]].self, from: data) else {
-            return nil
+        // Nombre real del lugar, sin pisar lo que el usuario ya haya escrito.
+        Task {
+            guard let name = await placeSearch.name(for: coordinate),
+                  selectedDestination == destination,
+                  destinationName == placeholder else { return }
+            destinationName = name
+            tripEngine.updateDestinationName(name)
         }
-        searchCache = decoded
-        return decoded[query]
     }
 
-    private func persistCache(_ cache: [String: [PlaceResult]]) {
-        guard let url = cacheFileURL(),
-              let data = try? JSONEncoder().encode(cache) else { return }
-        try? data.write(to: url)
-    }
-
-    // (DESACTIVADO) Carga de paraderos
-//    func loadBusStops() { ... }
-
-    // MARK: - (DESACTIVADO) Selección de Rutas y Paradas
-//    func selectRoute(_ routeName: String) { ... }
-//    func selectStop(_ stop: BusStop) { ... }
-//    func handleMapStopSelection(_ stop: BusStop?) { ... }
-//    func clearRouteFilter() { ... }
-
-    // MARK: - Public: Map Region
-
-    /// Stores the current visible map region and computes the north–south camera distance.
-    ///
-    /// - Parameter region: The current `MKCoordinateRegion` from `onMapCameraChange`.
     func updateVisibleRegion(_ region: MKCoordinateRegion) {
         mapVisibleRegion = region
-        let north = CLLocation(latitude: region.center.latitude + region.span.latitudeDelta / 2,
-                               longitude: region.center.longitude)
-        let south = CLLocation(latitude: region.center.latitude - region.span.latitudeDelta / 2,
-                               longitude: region.center.longitude)
-        mapCameraDistance = north.distance(from: south)
     }
 
-    // MARK: - Public: Sheet Detents
+    // MARK: - Sheet Detents
 
-    /// Animates the sheet detent to the default for the current state.
     func updateDetentForCurrentState() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+        withAnimation(.busnapSpring) {
             selectedDetent = defaultDetent
         }
     }
 
-    // MARK: - Public: Destination
+    // MARK: - Destination
 
-    /// Updates the current destination and notifies the location manager.
-    ///
-    /// - Parameter destination: The new destination.
     func updateDestination(_ destination: Destination) {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+        let wasTracking = isTripActive
+        etaTask?.cancel()
+        withAnimation(.busnapSpring) {
             tripEngine.updateDestination(destination)
             destinationName = destination.name ?? ""
+            simulatedETA = nil
+            routeDistance = nil
+            routePath = []
+            errorMessage = nil
             fetchETA(for: destination)
             updateDetentForCurrentState()
         }
-        let coord = CLLocationCoordinate2D(latitude: destination.latitude, longitude: destination.longitude)
-        locationManager.setDestination(coord)
+        if wasTracking { stopTracking() }
     }
 
     /// Persiste el nombre editado y actualiza el favorito si ya existe (upsert).
     func confirmDestinationName() {
         let trimmed = destinationName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let name = trimmed.isEmpty ? "Punto Seleccionado" : trimmed
+        let name = trimmed.isEmpty ? "Punto seleccionado" : trimmed
         tripEngine.updateDestinationName(name)
 
-        // Si el destino ya está en favoritos, actualizamos el nombre también
-        guard let dest = tripEngine.currentDestination else { return }
-        if let index = savedFavorites.firstIndex(where: { $0.latitude == dest.latitude && $0.longitude == dest.longitude }) {
-            var updated = savedFavorites[index]
-            updated.name = name
-            savedFavorites[index] = updated
-            preferencesStore.saveFavorites(savedFavorites)
-        }
+        guard let dest = tripEngine.currentDestination,
+              let index = savedFavorites.firstIndex(where: { $0.isSamePlace(as: dest) }) else { return }
+        savedFavorites[index].name = name
+        preferencesStore.saveFavorites(savedFavorites)
     }
 
-    /// Clears the current destination and resets all related state.
     func clearDestination() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-            tripEngine.cancelTrip()
-            simulatedETA = nil
-            errorMessage = nil
+        resetTrip()
+        withAnimation(.busnapSpring) {
             destinationName = ""
             searchText = ""
             updateDetentForCurrentState()
         }
-        locationManager.clearDestination()
-        isApproachingStop = false
-        distanceToStop = nil
     }
 
-    /// Selects a favorite destination and begins navigation toward it.
-    ///
-    /// - Parameter dest: The saved favorite to navigate toward.
     func selectFavorite(_ dest: Destination) {
         updateDestination(dest)
     }
 
-    // MARK: - Public: Favorites
+    // MARK: - Favorites & Recents
 
-    /// Guarda el destino actual como favorito con el ícono dado (upsert por coordenadas).
-    ///
-    /// - Parameter icon: Nombre de SF Symbol para representar el favorito (ej. `"house.fill"`).
+    /// Guarda el destino actual como favorito con el ícono dado (upsert por ubicación).
     func saveFavorite(icon: String) {
-        guard let dest = tripEngine.currentDestination else { return }
-        var saved = dest
+        guard var saved = tripEngine.currentDestination else { return }
         saved.icon = icon
-        // Buscamos por coordenadas para evitar duplicados aunque el nombre haya cambiado
-        if let index = savedFavorites.firstIndex(where: { $0.latitude == dest.latitude && $0.longitude == dest.longitude }) {
+        if let index = savedFavorites.firstIndex(where: { $0.isSamePlace(as: saved) }) {
             savedFavorites[index] = saved
         } else {
             savedFavorites.append(saved)
@@ -430,114 +378,131 @@ final class MapDashboardViewModel {
         preferencesStore.saveFavorites(savedFavorites)
     }
 
-    /// Elimina el destino actual de la lista de favoritos (búsqueda por coordenadas).
     func removeFavorite() {
         guard let dest = tripEngine.currentDestination else { return }
-        savedFavorites.removeAll { $0.latitude == dest.latitude && $0.longitude == dest.longitude }
+        removeFavorite(dest)
+    }
+
+    func removeFavorite(_ favorite: Destination) {
+        savedFavorites.removeAll { $0.isSamePlace(as: favorite) }
         preferencesStore.saveFavorites(savedFavorites)
     }
 
-    /// Indica si el destino actual ya está en favoritos (comparación por coordenadas).
-    ///
-    /// - Returns: `true` si el destino ya está guardado como favorito.
     func isCurrentDestinationFavorite() -> Bool {
         guard let dest = tripEngine.currentDestination else { return false }
-        return savedFavorites.contains { $0.latitude == dest.latitude && $0.longitude == dest.longitude }
+        return savedFavorites.contains { $0.isSamePlace(as: dest) }
     }
 
-    /// Reloads the favorites list from persistent storage.
     func loadFavorites() {
         savedFavorites = preferencesStore.loadFavorites()
     }
 
-    // MARK: - Public: Trip Lifecycle
+    func removeRecent(_ recent: Destination) {
+        recentDestinations.removeAll { $0.isSamePlace(as: recent) }
+        preferencesStore.saveRecents(recentDestinations)
+    }
 
-    /// Activates the trip, transitioning to the `.monitoring` state.
-    ///
-    /// Checks for appropriate location permissions and shows an error if any are missing.
+    func clearRecents() {
+        recentDestinations = []
+        preferencesStore.saveRecents([])
+    }
+
+    private func addRecent(_ destination: Destination) {
+        var recents = recentDestinations.filter { !$0.isSamePlace(as: destination) }
+        recents.insert(destination, at: 0)
+        recentDestinations = Array(recents.prefix(maxRecents))
+        preferencesStore.saveRecents(recentDestinations)
+    }
+
+    // MARK: - Trip Lifecycle
+
+    /// Inicia el viaje si hay permiso de ubicación "Siempre"; si no, lo pide
+    /// y el viaje arranca solo cuando el usuario lo concede.
     func activateTrip() {
-        guard let destination = tripEngine.currentDestination else { return }
+        guard tripEngine.currentDestination != nil else { return }
 
-        if permissionState == .notDetermined {
+        switch permissionState {
+        case .notDetermined:
+            pendingActivation = true
             locationManager.requestAlwaysAuthorization()
             return
-        }
 
-        if permissionState == .denied || permissionState == .restricted {
-            errorMessage = "No podemos activar la alarma sin acceso al GPS."
+        case .denied, .restricted:
+            showError("No podemos activar la alarma sin acceso al GPS.", needsSettings: true)
             return
-        }
 
-        if permissionState == .authorizedWhenInUse {
-            errorMessage = "La alarma requiere permiso 'Siempre' para funcionar en segundo plano."
+        case .authorizedWhenInUse:
+            pendingActivation = true
+            locationManager.requestAlwaysAuthorization()
+            showError("La alarma requiere permiso 'Siempre' para funcionar en segundo plano.", needsSettings: true)
             return
-        }
 
-        AudioManager.shared.prepareAudioEngine()
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-            tripEngine.startTrip(to: destination, leadTime: leadTime, soundName: ringtoneName)
+        case .authorizedAlways:
+            startTrip()
+        }
+    }
+
+    private func startTrip() {
+        guard let destination = tripEngine.currentDestination else { return }
+        pendingActivation = false
+
+        withAnimation(.busnapSpring) {
+            tripEngine.startTrip(
+                to: destination,
+                leadTime: leadTime,
+                soundName: settings.ringtoneName,
+                vibrate: settings.vibrationEnabled
+            )
             isPaused = false
             errorMessage = nil
             updateDetentForCurrentState()
         }
+        locationManager.startTracking(to: destination.coordinate)
+        addRecent(destination)
+
+        Task {
+            notificationPermission = await tripEngine.requestNotificationPermissionIfNeeded()
+        }
     }
 
-    /// Pauses the active trip.
     func pauseTrip() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+        withAnimation(.busnapSpring) {
             isPaused = true
         }
     }
 
-    /// Resumes a paused trip and refreshes the ETA.
     func resumeTrip() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+        withAnimation(.busnapSpring) {
             isPaused = false
-            if let destination = selectedDestination {
-                lastETARequestTime = Date()
-                fetchETA(for: destination)
-            }
+        }
+        if let destination = selectedDestination {
+            lastETARequestTime = Date()
+            fetchETA(for: destination)
         }
     }
 
-    /// Cancels the trip and clears all trip-related state.
     func cancelTrip() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-            tripEngine.cancelTrip()
-            simulatedETA = nil
-            errorMessage = nil
-            isPaused = false
-            lastETARequestTime = .distantPast
+        resetTrip()
+        withAnimation(.busnapSpring) {
             updateDetentForCurrentState()
         }
-        locationManager.clearDestination()
-        isApproachingStop = false
-        distanceToStop = nil
     }
 
-    /// Dismisses the finished state. Alias for `cancelTrip()`.
+    /// Botón "Detener alarma": apaga sonido y vibración y vuelve al inicio.
     func dismissFinished() {
         cancelTrip()
     }
 
-    // MARK: - Public: Configuration
+    // MARK: - Configuration
 
-    /// Updates the lead time and persists the new value.
-    ///
-    /// - Parameter newTime: The new lead time.
     func updateLeadTime(_ newTime: AlertLeadTime) {
-        self.leadTime = newTime
+        leadTime = newTime
         preferencesStore.saveLeadTime(newTime)
     }
 
-    // MARK: - Public: Scene Phase
+    // MARK: - Scene Phase
 
-    /// Handles `ScenePhase` transitions for energy management.
-    ///
-    /// Enables eco‑mode (low GPS accuracy) when the app enters the background and
-    /// restores normal accuracy on return to foreground.
-    ///
-    /// - Parameter phase: The new scene phase.
+    /// Modo ahorro en segundo plano y refresco al volver a primer plano.
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .background:
@@ -547,10 +512,9 @@ final class MapDashboardViewModel {
         case .active:
             isAppInBackground = false
             locationManager.disableEcoMode()
+            refreshNotificationPermission()
 
-            if (tripEngine.state == .monitoring || tripEngine.state == .criticalZone),
-               let destination = selectedDestination,
-               !isPaused {
+            if isTripActive, let destination = selectedDestination, !isPaused {
                 lastETARequestTime = Date()
                 fetchETA(for: destination)
             }
@@ -560,66 +524,110 @@ final class MapDashboardViewModel {
         }
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Private
 
-    /// Normalizes a string for diacritic‑ and case‑insensitive comparison.
-    ///
-    /// - Parameter string: The raw string.
-    /// - Returns: A folded string suitable for comparison.
-    private func normalized(_ string: String) -> String {
-        string.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    private func showError(_ message: String, needsSettings: Bool) {
+        errorMessage = message
+        errorNeedsSettings = needsSettings
     }
 
-    /// Fetches an ETA estimate from the current location to the given destination.
-    ///
-    /// - Parameters:
-    ///   - destination: The target destination.
-    ///   - currentLocation: An optional starting location. Defaults to the user's current location.
-    private func fetchETA(for destination: Destination, from currentLocation: CLLocation? = nil) {
-        guard !isFetchingETA else { return }
-        isFetchingETA = true
-        if simulatedETA == nil { isLoadingETA = true }
-        errorMessage = nil
-
+    private func refreshNotificationPermission() {
         Task {
+            notificationPermission = await tripEngine.notificationPermissionStatus()
+        }
+    }
+
+    private func stopTracking() {
+        locationManager.stopTracking()
+        isApproachingStop = false
+        distanceToStop = nil
+    }
+
+    /// Estado común de cancelar el viaje o quitar el destino.
+    private func resetTrip() {
+        etaTask?.cancel()
+        etaTask = nil
+        pendingActivation = false
+        withAnimation(.busnapSpring) {
+            tripEngine.cancelTrip()
+            simulatedETA = nil
+            routeDistance = nil
+            etaUpdatedAt = nil
+            routePath = []
+            isLoadingETA = false
+            errorMessage = nil
+            isPaused = false
+        }
+        lastETARequestTime = .distantPast
+        stopTracking()
+    }
+
+    private func handleAuthorizationChange(_ state: LocationPermissionState) {
+        guard pendingActivation else { return }
+        switch state {
+        case .authorizedAlways:
+            errorMessage = nil
+            startTrip()
+        case .denied, .restricted:
+            pendingActivation = false
+            showError("No podemos activar la alarma sin acceso al GPS.", needsSettings: true)
+        case .authorizedWhenInUse:
+            showError("La alarma requiere permiso 'Siempre' para funcionar en segundo plano.", needsSettings: true)
+        case .notDetermined:
+            break
+        }
+    }
+
+    private func handleAlarmTriggered() {
+        etaTask?.cancel()
+        stopTracking()
+        updateDetentForCurrentState()
+    }
+
+    /// Estima la ruta hacia el destino. Una petición nueva cancela la anterior,
+    /// así nunca se muestra el ETA de un destino previo.
+    private func fetchETA(for destination: Destination, from currentLocation: CLLocation? = nil) {
+        etaTask?.cancel()
+        if simulatedETA == nil { isLoadingETA = true }
+
+        etaTask = Task {
+            defer { if !Task.isCancelled { isLoadingETA = false } }
             do {
                 let estimate = try await routeEstimator.estimateRoute(to: destination, from: currentLocation)
-                self.simulatedETA = estimate.expectedTravelTime
-                self.isLoadingETA = false
-                self.isFetchingETA = false
+                try Task.checkCancellation()
+                simulatedETA = estimate.expectedTravelTime
+                routeDistance = estimate.distance
+                etaUpdatedAt = .now
+                if !estimate.path.isEmpty { routePath = estimate.path }
+                if errorMessage != nil, !errorNeedsSettings { errorMessage = nil }
+            } catch is CancellationError {
+                // Reemplazada por una petición más reciente.
             } catch {
-                self.errorMessage = error.localizedDescription
-                self.isLoadingETA = false
-                self.isFetchingETA = false
+                guard !Task.isCancelled else { return }
+                showError(error.localizedDescription, needsSettings: false)
             }
         }
     }
 
-    /// Processes an incoming location update from the location manager.
-    ///
-    /// Updates proximity state (`isApproachingStop`, `distanceToStop`), triggers arrival
-    /// at the 100 m threshold, and periodically refreshes the ETA (every 60 s).
-    ///
-    /// - Parameter location: The latest device location.
+    /// Actualiza la proximidad, dispara la llegada a 100 m y refresca el ETA cada 60 s.
     private func processLocationUpdate(_ location: CLLocation) {
-        let dest = locationManager.distanceToDestination
-        distanceToStop = dest
-        isApproachingStop = if let d = dest { d < 500 } else { false }
+        let distance = locationManager.distanceToDestination
+        distanceToStop = distance
+        isApproachingStop = distance.map { $0 < 500 } ?? false
 
-        if let d = dest, d < 100, tripEngine.state == .monitoring || tripEngine.state == .criticalZone {
-            tripEngine.triggerArrival(for: selectedDestination?.name ?? "stop", soundName: ringtoneName)
+        guard isTripActive else { return }
+
+        if let distance, distance < arrivalThreshold {
+            tripEngine.triggerArrival()
+            return
         }
 
-        guard tripEngine.state == .monitoring || tripEngine.state == .criticalZone,
-              let destination = selectedDestination,
-              !isPaused else { return }
-
-        guard !isAppInBackground else { return }
+        guard !isPaused, !isAppInBackground, let destination = selectedDestination else { return }
 
         let now = Date()
-        if now.timeIntervalSince(lastETARequestTime) >= 60 {
+        if now.timeIntervalSince(lastETARequestTime) >= etaRefreshInterval {
             lastETARequestTime = now
-            fetchETA(for: destination)
+            fetchETA(for: destination, from: location)
         }
     }
 }
@@ -628,7 +636,6 @@ final class MapDashboardViewModel {
 
 extension MapDashboardViewModel {
 
-    /// The current location‑permission state, forwarded from the location manager.
     var permissionState: LocationPermissionState {
         locationManager.permissionState
     }
@@ -639,6 +646,9 @@ extension MapDashboardViewModel {
 /// Elemento de sugerencia presentado en la lista del sheet inferior.
 enum SearchSuggestion: Identifiable {
 
+    /// Sugerencia de autocompletado mientras se escribe.
+    case completion(PlaceSuggestion)
+
     /// Un lugar real obtenido de MKLocalSearch.
     case place(PlaceResult)
 
@@ -647,6 +657,7 @@ enum SearchSuggestion: Identifiable {
 
     var id: String {
         switch self {
+        case .completion(let suggestion): return "cmp_\(suggestion.id)"
         case .place(let place): return place.id
         case .favorite(let dest): return "fav_\(dest.latitude)_\(dest.longitude)"
         }

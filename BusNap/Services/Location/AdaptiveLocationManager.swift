@@ -1,107 +1,77 @@
+import OSLog
 import Foundation
 import CoreLocation
 import Observation
 
+/// GPS adaptativo: ajusta la precisión según la distancia al destino.
+///
+/// - Lejos (> 2 km): precisión de 3 km (antenas celulares, casi sin batería).
+/// - Media (1–2 km): precisión de 1 km. En segundo plano se mantiene en "lejos".
+/// - Cerca (< 1 km): precisión de navegación, siempre, para no pasarse de parada.
 @MainActor
 @Observable
 final class AdaptiveLocationManager: NSObject, LocationManaging {
 
     // MARK: - Public State
-    private(set) var permissionState: LocationPermissionState = .notDetermined
-    private(set) var currentAccuracy: CLLocationAccuracy = kCLLocationAccuracyThreeKilometers
-    private(set) var distanceToDestination: CLLocationDistance? = nil
 
-    // MARK: - Dependencies
+    private(set) var permissionState: LocationPermissionState = .notDetermined
+    private(set) var distanceToDestination: CLLocationDistance?
+
+    // MARK: - Private State
+
     @ObservationIgnored private let clManager = CLLocationManager()
     @ObservationIgnored private var locationHandler: ((CLLocation) -> Void)?
-    private var destination: CLLocation? = nil
-
-    // MARK: - Thresholds
-    private let farDistance: CLLocationDistance = 3_000
-    private let mediumDistance: CLLocationDistance = 2_000
-    private let nearDistance: CLLocationDistance = 1_000
+    @ObservationIgnored private var authorizationHandler: ((LocationPermissionState) -> Void)?
+    @ObservationIgnored private var destination: CLLocation?
+    @ObservationIgnored private var level: AccuracyLevel?
+    @ObservationIgnored private var isInBackground = false
 
     override init() {
         super.init()
         clManager.delegate = self
         clManager.activityType = .automotiveNavigation
-        clManager.pausesLocationUpdatesAutomatically = true
-        clManager.allowsBackgroundLocationUpdates = true
-        clManager.showsBackgroundLocationIndicator = true
-        permissionState = mapAuthorizationStatus(clManager.authorizationStatus)
-        applyAccuracy(.far)
-        clManager.startUpdatingLocation()
+        permissionState = LocationPermissionState(clManager.authorizationStatus)
+        // Sin startUpdatingLocation(): el GPS solo se enciende durante un viaje.
     }
 
-    // MARK: - Destination
+    // MARK: - Tracking
 
-    func setDestination(_ coordinate: CLLocationCoordinate2D) {
+    func startTracking(to coordinate: CLLocationCoordinate2D) {
         destination = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        // Un autobús detenido en el tráfico NO debe pausar el GPS: en segundo
+        // plano iOS no lo reanudaría y la alarma de proximidad no llegaría.
+        clManager.pausesLocationUpdatesAutomatically = false
+        if permissionState == .authorizedAlways {
+            clManager.allowsBackgroundLocationUpdates = true
+            clManager.showsBackgroundLocationIndicator = true
+        }
+        apply(.far)
+        clManager.startUpdatingLocation()
+        Log.location.info("Seguimiento de viaje iniciado")
     }
 
-    func clearDestination() {
+    func stopTracking() {
+        clManager.stopUpdatingLocation()
+        clManager.allowsBackgroundLocationUpdates = false
         destination = nil
         distanceToDestination = nil
+        level = nil
+        Log.location.info("Seguimiento de viaje detenido")
     }
 
-    // MARK: - Adaptive Accuracy
+    // MARK: - Energy
 
-    private enum AccuracyLevel {
-        case far
-        case medium
-        case near
+    func enableEcoMode() {
+        isInBackground = true
+        reevaluate(clManager.location)
     }
 
-    private func accuracyLevel(for distance: CLLocationDistance) -> AccuracyLevel {
-        switch distance {
-        case ..<nearDistance: return .near
-        case ..<mediumDistance: return .medium
-        default: return .far
-        }
+    func disableEcoMode() {
+        isInBackground = false
+        reevaluate(clManager.location)
     }
 
-    private func applyAccuracy(_ level: AccuracyLevel) {
-        switch level {
-        case .far:
-            clManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
-            clManager.distanceFilter = 500
-            currentAccuracy = kCLLocationAccuracyThreeKilometers
-        case .medium:
-            clManager.desiredAccuracy = kCLLocationAccuracyKilometer
-            clManager.distanceFilter = 200
-            currentAccuracy = kCLLocationAccuracyKilometer
-        case .near:
-            clManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-            clManager.distanceFilter = 10
-            currentAccuracy = kCLLocationAccuracyBestForNavigation
-        }
-    }
-
-    private func reevaluateAccuracy(for location: CLLocation) {
-        guard let destination else {
-            applyAccuracy(.far)
-            return
-        }
-
-        let distance = location.distance(from: destination)
-        distanceToDestination = distance
-
-        let currentLevel = accuracyLevel(for: distance)
-
-        var storedLevel: AccuracyLevel = .far
-        switch currentAccuracy {
-        case kCLLocationAccuracyThreeKilometers: storedLevel = .far
-        case kCLLocationAccuracyKilometer: storedLevel = .medium
-        case kCLLocationAccuracyBestForNavigation: storedLevel = .near
-        default: storedLevel = .far
-        }
-
-        if currentLevel != storedLevel {
-            applyAccuracy(currentLevel)
-        }
-    }
-
-    // MARK: - LocationManaging Conformance
+    // MARK: - Authorization
 
     func requestWhenInUseAuthorization() {
         clManager.requestWhenInUseAuthorization()
@@ -111,31 +81,74 @@ final class AdaptiveLocationManager: NSObject, LocationManaging {
         clManager.requestAlwaysAuthorization()
     }
 
-    func enableEcoMode() {
-        clManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
-        clManager.distanceFilter = 500
-        currentAccuracy = kCLLocationAccuracyThreeKilometers
-    }
-
-    func disableEcoMode() {
-        reevaluateAccuracy(for: clManager.location ?? CLLocation(latitude: 0, longitude: 0))
-        clManager.startUpdatingLocation()
-    }
-
     func setLocationHandler(_ handler: @escaping (CLLocation) -> Void) {
         locationHandler = handler
     }
 
-    // MARK: - Private
+    func setAuthorizationHandler(_ handler: @escaping (LocationPermissionState) -> Void) {
+        authorizationHandler = handler
+    }
 
-    private func mapAuthorizationStatus(_ status: CLAuthorizationStatus) -> LocationPermissionState {
-        switch status {
-        case .notDetermined: return .notDetermined
-        case .restricted: return .restricted
-        case .denied: return .denied
-        case .authorizedWhenInUse: return .authorizedWhenInUse
-        case .authorizedAlways: return .authorizedAlways
-        @unknown default: return .notDetermined
+    // MARK: - Adaptive Accuracy
+
+    private func reevaluate(_ location: CLLocation?) {
+        guard let destination, let location else { return }
+        let distance = location.distance(from: destination)
+        distanceToDestination = distance
+
+        let target = AccuracyLevel(distance: distance, inBackground: isInBackground)
+        if target != level { apply(target) }
+    }
+
+    private func apply(_ newLevel: AccuracyLevel) {
+        level = newLevel
+        clManager.desiredAccuracy = newLevel.desiredAccuracy
+        clManager.distanceFilter = newLevel.distanceFilter
+    }
+
+    fileprivate func handleAuthorizationChange(_ status: CLAuthorizationStatus) {
+        let newState = LocationPermissionState(status)
+        permissionState = newState
+        // Si el usuario sube a "Siempre" con un viaje activo, habilitamos segundo plano.
+        if newState == .authorizedAlways, destination != nil {
+            clManager.allowsBackgroundLocationUpdates = true
+            clManager.showsBackgroundLocationIndicator = true
+        }
+        authorizationHandler?(newState)
+    }
+
+    fileprivate func handleLocation(_ location: CLLocation) {
+        reevaluate(location)
+        locationHandler?(location)
+    }
+}
+
+// MARK: - AccuracyLevel
+
+private enum AccuracyLevel: Equatable {
+    case far, medium, near
+
+    init(distance: CLLocationDistance, inBackground: Bool) {
+        switch distance {
+        case ..<1_000: self = .near
+        case ..<2_000: self = inBackground ? .far : .medium
+        default: self = .far
+        }
+    }
+
+    var desiredAccuracy: CLLocationAccuracy {
+        switch self {
+        case .far: kCLLocationAccuracyThreeKilometers
+        case .medium: kCLLocationAccuracyKilometer
+        case .near: kCLLocationAccuracyBestForNavigation
+        }
+    }
+
+    var distanceFilter: CLLocationDistance {
+        switch self {
+        case .far: 500
+        case .medium: 200
+        case .near: 10
         }
     }
 }
@@ -145,19 +158,20 @@ final class AdaptiveLocationManager: NSObject, LocationManaging {
 extension AdaptiveLocationManager: CLLocationManagerDelegate {
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let newStatus = manager.authorizationStatus
+        let status = manager.authorizationStatus
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            permissionState = mapAuthorizationStatus(newStatus)
+            self?.handleAuthorizationChange(status)
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            reevaluateAccuracy(for: location)
-            locationHandler?(location)
+            self?.handleLocation(location)
         }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Log.location.error("Error de ubicación: \(error.localizedDescription, privacy: .public)")
     }
 }
